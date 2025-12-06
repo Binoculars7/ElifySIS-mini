@@ -3,396 +3,380 @@ import {
 } from '../types';
 
 // ==========================================
-// CONFIGURATION
-// ==========================================
-
-const USE_FIREBASE = false;
-
-// ==========================================
-// LOCAL STORAGE MOCK SERVICE
+// MOCK SERVICE IMPLEMENTATION
+// Replaces Firebase with LocalStorage for development stability
 // ==========================================
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const getStorage = <T>(key: string): T[] => {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
-  } catch (e) { return []; }
+const getCollection = <T>(collectionName: string): T[] => {
+  const data = localStorage.getItem(`elifysis_${collectionName}`);
+  return data ? JSON.parse(data) : [];
 };
 
-const setStorage = <T>(key: string, data: T[]) => {
-  localStorage.setItem(key, JSON.stringify(data));
+const saveCollection = <T>(collectionName: string, data: T[]) => {
+  localStorage.setItem(`elifysis_${collectionName}`, JSON.stringify(data));
 };
 
-// Seed Data
+// Seed initial data if empty
 const seedData = () => {
-  if (USE_FIREBASE) return;
-  const DEFAULT_BIZ = 'default_biz';
-  
-  if (!localStorage.getItem('products')) {
-    const products: Product[] = [
-      { id: 'p1', businessId: DEFAULT_BIZ, name: 'Fresh Milk 1L', description: 'Whole milk', quantity: 50, buyPrice: 1.50, sellPrice: 2.50, category: 'Dairy', supplierId: 's1', lastUpdated: Date.now() },
-      { id: 'p2', businessId: DEFAULT_BIZ, name: 'Whole Wheat Bread', description: 'Sliced bread', quantity: 8, buyPrice: 1.00, sellPrice: 2.20, category: 'Bakery', supplierId: 's1', lastUpdated: Date.now() },
-      { id: 'p3', businessId: DEFAULT_BIZ, name: 'Coca Cola 500ml', description: 'Soda', quantity: 100, buyPrice: 0.80, sellPrice: 1.50, category: 'Beverages', supplierId: 's2', lastUpdated: Date.now() },
-      { id: 'p4', businessId: DEFAULT_BIZ, name: 'Apple Red Delicious', description: 'Fresh', quantity: 120, buyPrice: 0.50, sellPrice: 1.00, category: 'Produce', supplierId: 's1', lastUpdated: Date.now() },
-      { id: 'p5', businessId: DEFAULT_BIZ, name: 'Orange Juice 1L', description: '100% Juice', quantity: 40, buyPrice: 2.00, sellPrice: 3.50, category: 'Beverages', supplierId: 's2', lastUpdated: Date.now() },
-      ...Array.from({ length: 25 }).map((_, i) => ({
-          id: `gen_${i}`,
-          businessId: DEFAULT_BIZ,
-          name: `Generic Product ${i + 1}`,
-          description: 'General Item',
-          quantity: 50,
-          buyPrice: 5,
-          sellPrice: 10,
-          category: 'General',
-          supplierId: 's1',
-          lastUpdated: Date.now()
-      }))
-    ];
-    setStorage('products', products);
-  }
-  if (!localStorage.getItem('users')) {
-    setStorage('users', [
-      { id: 'u1', businessId: DEFAULT_BIZ, username: 'admin', email: 'admin@store.com', password: 'password', role: 'ADMIN', isActive: true, createdAt: Date.now() }
-    ]);
-  }
-  if (!localStorage.getItem('customers')) {
-    setStorage('customers', [{ id: 'c1', businessId: DEFAULT_BIZ, firstName: 'John', lastName: 'Doe', phone: '555-9999', address: 'Main St', createdAt: Date.now() }]);
-  }
-  if (!localStorage.getItem('categories')) {
-    setStorage('categories', [
-        { id: 'cat1', businessId: DEFAULT_BIZ, name: 'Dairy' },
-        { id: 'cat2', businessId: DEFAULT_BIZ, name: 'Bakery' },
-        { id: 'cat3', businessId: DEFAULT_BIZ, name: 'Beverages' },
-        { id: 'cat4', businessId: DEFAULT_BIZ, name: 'Produce' },
-        { id: 'cat5', businessId: DEFAULT_BIZ, name: 'General' },
-        { id: 'cat6', businessId: DEFAULT_BIZ, name: 'Snacks' },
-        { id: 'cat7', businessId: DEFAULT_BIZ, name: 'Household' }
-    ]);
-  }
-  if (!localStorage.getItem('suppliers')) {
-    setStorage('suppliers', [
-        { id: 's1', businessId: DEFAULT_BIZ, name: 'Global Foods Inc', phone: '123-456-7890', address: '123 Warehouse Dr', createdAt: Date.now() },
-        { id: 's2', businessId: DEFAULT_BIZ, name: 'BevCo Ltd', phone: '987-654-3210', address: '456 Soda Ln', createdAt: Date.now() }
-    ]);
-  }
+    if (!localStorage.getItem('elifysis_users')) {
+        const adminUser: User = {
+            id: 'admin_1',
+            businessId: 'biz_default',
+            username: 'Admin User',
+            email: 'admin@store.com',
+            role: 'ADMIN',
+            isActive: true,
+            createdAt: Date.now()
+        };
+        saveCollection('users', [adminUser]);
+        
+        // Seed default settings
+        saveCollection('settings', [{
+            businessId: 'biz_default',
+            currency: 'USD',
+            currencySymbol: '$'
+        }]);
+    }
 };
+
+// Initialize seed data
+try {
+    if (typeof window !== 'undefined') {
+        seedData();
+    }
+} catch (e) {
+    console.warn("Storage not available");
+}
 
 const MockService = {
-  // Settings
-  getSettings: async (businessId: string): Promise<Settings> => {
-      const allSettings = getStorage<Settings>('settings');
-      const found = allSettings.find(s => s.businessId === businessId);
-      return found || { businessId, currency: 'USD', currencySymbol: '$' };
-  },
-  saveSettings: async (settings: Settings): Promise<void> => {
-      const list = getStorage<Settings>('settings');
-      const idx = list.findIndex(s => s.businessId === settings.businessId);
-      if (idx >= 0) list[idx] = settings;
-      else list.push(settings);
-      setStorage('settings', list);
-  },
-
-  // Notifications
-  getNotifications: async (businessId: string): Promise<Notification[]> => {
-      return getStorage<Notification>('notifications').filter(n => n.businessId === businessId);
-  },
-  saveNotification: async (notif: Notification): Promise<void> => {
-      const list = getStorage<Notification>('notifications');
-      list.push(notif);
-      setStorage('notifications', list);
-  },
-  markNotificationRead: async (id: string): Promise<void> => {
-      const list = getStorage<Notification>('notifications');
-      const idx = list.findIndex(n => n.id === id);
-      if(idx >= 0) {
-          list[idx].read = true;
-          setStorage('notifications', list);
-      }
-  },
-
-  // Products
-  getProducts: async (businessId: string): Promise<Product[]> => { 
-      await delay(200); 
-      return getStorage<Product>('products').filter(p => p.businessId === businessId); 
-  },
-  saveProduct: async (item: Product): Promise<void> => {
-    await delay(200);
-    const list = getStorage<Product>('products');
-    if (item.id) {
-        const idx = list.findIndex(p => p.id === item.id);
-        if (idx >= 0) list[idx] = item;
-        else list.push(item);
-    } else {
-        list.push({ ...item, id: Math.random().toString(36).substr(2, 9) });
-    }
-    setStorage('products', list);
-  },
-  importProducts: async (products: Product[]): Promise<void> => {
-    await delay(500);
-    const list = getStorage<Product>('products');
-    products.forEach(p => {
-        list.push({ ...p, id: Math.random().toString(36).substr(2, 9), lastUpdated: Date.now() });
-    });
-    setStorage('products', list);
-  },
-  deleteProduct: async (id: string): Promise<void> => {
-    setStorage('products', getStorage<Product>('products').filter(p => p.id !== id));
-  },
-
-  // Categories
-  getCategories: async (businessId: string): Promise<Category[]> => { 
-      await delay(100); 
-      return getStorage<Category>('categories').filter(c => c.businessId === businessId); 
-  },
-  saveCategory: async (cat: Category): Promise<void> => {
-      const list = getStorage<Category>('categories');
-      if(cat.id) {
-          const idx = list.findIndex(c => c.id === cat.id);
-          if(idx >= 0) list[idx] = cat;
-          else list.push(cat);
-      } else {
-          list.push({ ...cat, id: Math.random().toString(36).substr(2,9) });
-      }
-      setStorage('categories', list);
-  },
-  deleteCategory: async (id: string): Promise<void> => {
-      setStorage('categories', getStorage<Category>('categories').filter(c => c.id !== id));
-  },
-
-  // Stock
-  adjustStock: async (productId: string, qty: number, type: 'restock' | 'adjustment'): Promise<void> => {
-    const products = getStorage<Product>('products');
-    const p = products.find(x => x.id === productId);
-    if(p) {
-        p.quantity += qty;
-        p.lastUpdated = Date.now();
-        setStorage('products', products);
-        
-        const logs = getStorage<StockLog>('stockLogs') || [];
-        logs.push({
-            id: Math.random().toString(36).substr(2,9),
-            businessId: p.businessId,
-            productId, productName: p.name, change: qty, type: type, date: Date.now(), balance: p.quantity
-        });
-        setStorage('stockLogs', logs);
-    }
-  },
-  getStockLogs: async (businessId: string): Promise<StockLog[]> => {
-      return (getStorage<StockLog>('stockLogs') || []).filter(l => l.businessId === businessId);
-  },
-
-  // Sales
-  createPendingOrder: async (sale: Sale): Promise<void> => {
-    await delay(200);
-    const sales = getStorage<Sale>('sales') || [];
-    sales.push({ ...sale, id: Math.random().toString(36).substr(2, 9), status: 'Pending' });
-    setStorage('sales', sales);
-  },
-
-  getPendingOrders: async (businessId: string): Promise<Sale[]> => {
-    await delay(200);
-    const sales = getStorage<Sale>('sales') || [];
-    return sales.filter(s => s.businessId === businessId && s.status === 'Pending').sort((a,b) => b.date - a.date);
-  },
-
-  completeOrder: async (saleId: string, paymentMethod: 'Cash' | 'Card' | 'Transfer'): Promise<void> => {
-    await delay(300);
-    const sales = getStorage<Sale>('sales');
-    const saleIndex = sales.findIndex(s => s.id === saleId);
-    
-    if (saleIndex > -1) {
-        const sale = sales[saleIndex];
-        sale.status = 'Completed';
-        sale.paymentMethod = paymentMethod;
-        setStorage('sales', sales);
-
-        const products = getStorage<Product>('products');
-        const logs = getStorage<StockLog>('stockLogs') || [];
-        
-        sale.items.forEach(item => {
-            const p = products.find(x => x.id === item.productId);
-            if(p) {
-                p.quantity -= item.quantity;
-                logs.push({
-                    id: Math.random().toString(36).substr(2,9),
-                    businessId: sale.businessId,
-                    productId: p.id, productName: p.name, change: -item.quantity, type: 'sale', date: Date.now(), balance: p.quantity
-                });
-            }
-        });
-        setStorage('products', products);
-        setStorage('stockLogs', logs);
-    }
-  },
-
-  getSales: async (businessId: string): Promise<Sale[]> => { 
-      await delay(200); 
-      return (getStorage<Sale>('sales') || []).filter(s => s.businessId === businessId && s.status === 'Completed'); 
-  },
-
-  // Users
+  // --- AUTHENTICATION ---
   login: async (email: string, password: string): Promise<User | null> => {
-    await delay(500);
-    const users = getStorage<User>('users');
-    const user = users.find(u => u.email === email && u.password === password);
-    return user && user.isActive ? user : null;
+      await delay(800);
+      const users = getCollection<User>('users');
+      // Case-insensitive email match
+      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      
+      if (user && user.isActive) {
+          // In mock mode, we accept any password for convenience, or specific ones
+          // For security in a real app, this would verify the hash
+          return user;
+      }
+      return null;
   },
 
   signup: async (user: User): Promise<boolean> => {
-    await delay(500);
-    const users = getStorage<User>('users');
-    if (users.find(u => u.email === user.email)) return false; 
-    users.push(user);
-    setStorage('users', users);
-    return true;
+      await delay(800);
+      const users = getCollection<User>('users');
+      if (users.find(u => u.email === user.email)) return false;
+      
+      const newUser = { ...user, id: `user_${Date.now()}` };
+      users.push(newUser);
+      saveCollection('users', users);
+      
+      // Initialize Default Settings
+      const settings = getCollection<Settings>('settings');
+      settings.push({ businessId: newUser.businessId, currency: 'USD', currencySymbol: '$' });
+      saveCollection('settings', settings);
+
+      return true;
   },
 
-  getUsers: async (businessId: string): Promise<User[]> => { 
-      await delay(200); 
-      return getStorage<User>('users').filter(u => u.businessId === businessId); 
+  // --- USERS ---
+  getUsers: async (businessId: string): Promise<User[]> => {
+      await delay(500);
+      return getCollection<User>('users').filter(u => u.businessId === businessId);
   },
+
   saveUser: async (user: User): Promise<void> => {
-      const list = getStorage<User>('users');
-      const existingUser = list.find(u => u.email === user.email);
-      if (existingUser && existingUser.id !== user.id) {
-          throw new Error("Email already exists in the system.");
-      }
+      await delay(500);
+      const users = getCollection<User>('users');
+      const idx = users.findIndex(u => u.id === user.id);
+      
+      const userData = { ...user };
+      if (!userData.id) userData.id = `user_${Date.now()}`;
 
-      if (user.id) {
-          const idx = list.findIndex(u => u.id === user.id);
-          if(idx >= 0) list[idx] = user;
-          else list.push(user);
+      if (idx >= 0) {
+          users[idx] = { ...users[idx], ...userData };
       } else {
-          list.push({...user, id: Math.random().toString(36).substr(2,9), createdAt: Date.now()});
+          users.push(userData);
       }
-      setStorage('users', list);
+      saveCollection('users', users);
   },
+
   deleteUser: async (id: string): Promise<void> => {
-      setStorage('users', getStorage<User>('users').filter(u => u.id !== id));
+      await delay(500);
+      const users = getCollection<User>('users').filter(u => u.id !== id);
+      saveCollection('users', users);
   },
 
-  // People & Suppliers
-  getCustomers: async (businessId: string): Promise<Customer[]> => getStorage<Customer>('customers').filter(c => c.businessId === businessId),
-  saveCustomer: async (c: Customer) => { 
-      const list = getStorage<Customer>('customers');
-      if(c.id) {
-          const idx = list.findIndex(x=>x.id===c.id);
-          if(idx >= 0) list[idx] = c;
-          else list.push(c);
+  // --- PRODUCTS ---
+  getProducts: async (bid: string) => {
+      await delay(300);
+      return getCollection<Product>('products').filter(p => p.businessId === bid);
+  },
+  saveProduct: async (p: Product) => {
+      await delay(300);
+      const list = getCollection<Product>('products');
+      if (p.id) {
+          const idx = list.findIndex(i => i.id === p.id);
+          if (idx >= 0) list[idx] = p;
       } else {
-          list.push({...c, id: Math.random().toString(36).substr(2,9), createdAt: Date.now()});
+          list.push({ ...p, id: `prod_${Date.now()}` });
       }
-      setStorage('customers', list);
+      saveCollection('products', list);
   },
-  deleteCustomer: async (id: string): Promise<void> => {
-      setStorage('customers', getStorage<Customer>('customers').filter(c => c.id !== id));
+  deleteProduct: async (id: string) => {
+      await delay(300);
+      saveCollection('products', getCollection<Product>('products').filter(p => p.id !== id));
+  },
+  importProducts: async (products: Product[]) => {
+      await delay(1000);
+      const list = getCollection<Product>('products');
+      products.forEach(p => list.push({ ...p, id: `prod_${Math.random().toString(36).substr(2,9)}` }));
+      saveCollection('products', list);
   },
 
-  getEmployees: async (businessId: string): Promise<Employee[]> => getStorage<Employee>('employees').filter(e => e.businessId === businessId),
+  // --- CATEGORIES ---
+  getCategories: async (bid: string) => {
+      await delay(200);
+      return getCollection<Category>('categories').filter(c => c.businessId === bid);
+  },
+  saveCategory: async (c: Category) => {
+      await delay(200);
+      const list = getCollection<Category>('categories');
+      if (c.id) {
+          const idx = list.findIndex(i => i.id === c.id);
+          if (idx >= 0) list[idx] = c;
+      } else {
+          list.push({ ...c, id: `cat_${Date.now()}` });
+      }
+      saveCollection('categories', list);
+  },
+  deleteCategory: async (id: string) => {
+       await delay(200);
+       saveCollection('categories', getCollection<Category>('categories').filter(c => c.id !== id));
+  },
+
+  // --- STOCK LOGS ---
+  adjustStock: async (productId: string, qty: number, type: 'restock' | 'adjustment') => {
+      await delay(300);
+      const products = getCollection<Product>('products');
+      const pIdx = products.findIndex(p => p.id === productId);
+      
+      if (pIdx >= 0) {
+          const p = products[pIdx];
+          const newQty = (p.quantity || 0) + qty;
+          products[pIdx] = { ...p, quantity: newQty };
+          saveCollection('products', products);
+
+          const logs = getCollection<StockLog>('stockLogs');
+          logs.push({
+              id: `log_${Date.now()}`,
+              businessId: p.businessId,
+              productId,
+              productName: p.name,
+              change: qty,
+              type,
+              date: Date.now(),
+              balance: newQty
+          });
+          saveCollection('stockLogs', logs);
+      }
+  },
+  getStockLogs: async (bid: string) => {
+      await delay(300);
+      return getCollection<StockLog>('stockLogs').filter(l => l.businessId === bid).sort((a,b) => b.date - a.date);
+  },
+
+  // --- SALES ---
+  createPendingOrder: async (sale: Sale) => {
+      await delay(300);
+      const sales = getCollection<Sale>('sales');
+      sales.push({ ...sale, id: `sale_${Date.now()}`, status: 'Pending' });
+      saveCollection('sales', sales);
+  },
+  getPendingOrders: async (bid: string) => {
+      await delay(300);
+      return getCollection<Sale>('sales').filter(s => s.businessId === bid && s.status === 'Pending');
+  },
+  completeOrder: async (saleId: string, paymentMethod: 'Cash'|'Card'|'Transfer') => {
+      await delay(500);
+      const sales = getCollection<Sale>('sales');
+      const sIdx = sales.findIndex(s => s.id === saleId);
+      
+      if (sIdx >= 0) {
+          const sale = sales[sIdx];
+          sale.status = 'Completed';
+          sale.paymentMethod = paymentMethod;
+          saveCollection('sales', sales);
+
+          // Update Stock
+          const products = getCollection<Product>('products');
+          const logs = getCollection<StockLog>('stockLogs');
+
+          sale.items.forEach(item => {
+              const pIdx = products.findIndex(p => p.id === item.productId);
+              if (pIdx >= 0) {
+                  const p = products[pIdx];
+                  const currentQty = p.quantity || 0;
+                  const newQty = currentQty - item.quantity;
+                  p.quantity = newQty;
+                  
+                  logs.push({
+                    id: `log_${Date.now()}_${Math.random()}`,
+                    businessId: sale.businessId,
+                    productId: item.productId,
+                    productName: item.productName,
+                    change: -item.quantity,
+                    type: 'sale',
+                    date: Date.now(),
+                    balance: newQty
+                  });
+              }
+          });
+          saveCollection('products', products);
+          saveCollection('stockLogs', logs);
+      }
+  },
+  getSales: async (bid: string) => {
+      await delay(300);
+      return getCollection<Sale>('sales').filter(s => s.businessId === bid && s.status === 'Completed');
+  },
+
+  // --- PEOPLE (Customers/Employees/Suppliers) ---
+  getCustomers: async (bid: string) => {
+      await delay(200);
+      return getCollection<Customer>('customers').filter(c => c.businessId === bid);
+  },
+  saveCustomer: async (c: Customer) => {
+      await delay(200);
+      const list = getCollection<Customer>('customers');
+      if (c.id) {
+          const idx = list.findIndex(i => i.id === c.id);
+          if (idx >= 0) list[idx] = c;
+      } else {
+          list.push({ ...c, id: `cust_${Date.now()}` });
+      }
+      saveCollection('customers', list);
+  },
+  deleteCustomer: async (id: string) => {
+      await delay(200);
+      saveCollection('customers', getCollection<Customer>('customers').filter(c => c.id !== id));
+  },
+
+  getEmployees: async (bid: string) => {
+      await delay(200);
+      return getCollection<Employee>('employees').filter(e => e.businessId === bid);
+  },
   saveEmployee: async (e: Employee) => {
-      const list = getStorage<Employee>('employees');
-      if(e.id) {
-          const idx = list.findIndex(x=>x.id===e.id);
-          if(idx >= 0) list[idx] = e;
-          else list.push(e);
+      await delay(200);
+      const list = getCollection<Employee>('employees');
+      if (e.id) {
+          const idx = list.findIndex(i => i.id === e.id);
+          if (idx >= 0) list[idx] = e;
       } else {
-          list.push({...e, id: Math.random().toString(36).substr(2,9), createdAt: Date.now()});
+          list.push({ ...e, id: `emp_${Date.now()}` });
       }
-      setStorage('employees', list);
+      saveCollection('employees', list);
   },
-  deleteEmployee: async (id: string): Promise<void> => {
-      setStorage('employees', getStorage<Employee>('employees').filter(e => e.id !== id));
+  deleteEmployee: async (id: string) => {
+      await delay(200);
+      saveCollection('employees', getCollection<Employee>('employees').filter(e => e.id !== id));
   },
 
-  getSuppliers: async (businessId: string): Promise<Supplier[]> => getStorage<Supplier>('suppliers').filter(s => s.businessId === businessId),
+  getSuppliers: async (bid: string) => {
+      await delay(200);
+      return getCollection<Supplier>('suppliers').filter(s => s.businessId === bid);
+  },
   saveSupplier: async (s: Supplier) => {
-      const list = getStorage<Supplier>('suppliers');
-      if(s.id) {
-          const idx = list.findIndex(x=>x.id===s.id);
-          if(idx >= 0) list[idx] = s;
-          else list.push(s);
+      await delay(200);
+      const list = getCollection<Supplier>('suppliers');
+      if (s.id) {
+          const idx = list.findIndex(i => i.id === s.id);
+          if (idx >= 0) list[idx] = s;
       } else {
-          list.push({...s, id: Math.random().toString(36).substr(2,9), createdAt: Date.now()});
+          list.push({ ...s, id: `sup_${Date.now()}` });
       }
-      setStorage('suppliers', list);
+      saveCollection('suppliers', list);
   },
-  deleteSupplier: async (id: string): Promise<void> => {
-    setStorage('suppliers', getStorage<Supplier>('suppliers').filter(s => s.id !== id));
+  deleteSupplier: async (id: string) => {
+      await delay(200);
+      saveCollection('suppliers', getCollection<Supplier>('suppliers').filter(s => s.id !== id));
   },
 
-  getExpenses: async (businessId: string): Promise<Expense[]> => getStorage<Expense>('expenses').filter(e => e.businessId === businessId),
+  // --- EXPENSES ---
+  getExpenses: async (bid: string) => {
+      await delay(200);
+      return getCollection<Expense>('expenses').filter(e => e.businessId === bid);
+  },
   addExpense: async (e: Expense) => {
-      const list = getStorage<Expense>('expenses');
-      list.push({...e, id: Math.random().toString(36).substr(2,9)});
-      setStorage('expenses', list);
+      await delay(200);
+      const list = getCollection<Expense>('expenses');
+      list.push({ ...e, id: `exp_${Date.now()}` });
+      saveCollection('expenses', list);
   },
-  deleteExpense: async (id: string): Promise<void> => {
-      setStorage('expenses', getStorage<Expense>('expenses').filter(e => e.id !== id));
+  deleteExpense: async (id: string) => {
+      await delay(200);
+      saveCollection('expenses', getCollection<Expense>('expenses').filter(e => e.id !== id));
   },
 
-  getDashboardStats: async (businessId: string) => {
-      const p = getStorage<Product>('products').filter(x => x.businessId === businessId);
-      const c = getStorage<Customer>('customers').filter(x => x.businessId === businessId);
-      const s = getStorage<Sale>('sales').filter(x => x.businessId === businessId && x.status === 'Completed');
-      const e = getStorage<Expense>('expenses').filter(x => x.businessId === businessId);
-      
-      const lowStockCount = p.filter(prod => prod.quantity < 10).length;
-      
-      const totalRevenue = s.reduce((acc, curr) => acc + curr.totalAmount, 0);
-      const totalExpenses = e.reduce((acc, curr) => acc + curr.amount, 0);
-      return { 
-          customerCount: c.length, 
-          productCount: p.length, 
-          saleCount: s.length, 
-          totalRevenue, 
-          totalExpenses, 
+  // --- DASHBOARD STATS ---
+  getDashboardStats: async (bid: string) => {
+      await delay(500);
+      const products = getCollection<Product>('products').filter(p => p.businessId === bid);
+      const customers = getCollection<Customer>('customers').filter(c => c.businessId === bid);
+      const sales = getCollection<Sale>('sales').filter(s => s.businessId === bid && s.status === 'Completed');
+      const expenses = getCollection<Expense>('expenses').filter(e => e.businessId === bid);
+
+      const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
+      const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+      return {
+          productCount: products.length,
+          customerCount: customers.length,
+          saleCount: sales.length,
+          totalRevenue,
+          totalExpenses,
           netProfit: totalRevenue - totalExpenses,
-          lowStockCount
+          lowStockCount: products.filter(p => p.quantity < 10).length
       };
+  },
+
+  // --- SETTINGS ---
+  getSettings: async (bid: string): Promise<Settings> => {
+      await delay(100);
+      const settings = getCollection<Settings>('settings').find(s => s.businessId === bid);
+      return settings || { businessId: bid, currency: 'USD', currencySymbol: '$' };
+  },
+  saveSettings: async (s: Settings) => {
+      await delay(200);
+      const list = getCollection<Settings>('settings');
+      const idx = list.findIndex(item => item.businessId === s.businessId);
+      if (idx >= 0) list[idx] = s;
+      else list.push(s);
+      saveCollection('settings', list);
+  },
+
+  // --- NOTIFICATIONS ---
+  getNotifications: async (bid: string) => {
+      await delay(100);
+      return getCollection<Notification>('notifications').filter(n => n.businessId === bid);
+  },
+  saveNotification: async (n: Notification) => {
+      const list = getCollection<Notification>('notifications');
+      list.push(n);
+      saveCollection('notifications', list);
+  },
+  markNotificationRead: async (id: string) => {
+      const list = getCollection<Notification>('notifications');
+      const idx = list.findIndex(n => n.id === id);
+      if (idx >= 0) {
+          list[idx].read = true;
+          saveCollection('notifications', list);
+      }
   }
 };
 
-const FirebaseService = {
-  getProducts: async (bid: string) => [] as Product[],
-  saveProduct: async (item: Product) => {},
-  importProducts: async (products: Product[]) => {},
-  deleteProduct: async (id: string) => {},
-  getCategories: async (bid: string) => [] as Category[],
-  saveCategory: async (cat: Category) => {},
-  deleteCategory: async (id: string) => {},
-  adjustStock: async (productId: string, qty: number, type: string) => {},
-  getStockLogs: async (bid: string) => [] as StockLog[],
-  createPendingOrder: async (sale: Sale) => {},
-  getPendingOrders: async (bid: string) => [] as Sale[],
-  completeOrder: async (saleId: string, paymentMethod: string) => {},
-  getSales: async (bid: string) => [] as Sale[],
-  login: async (e: string, p: string) => null, 
-  signup: async (user: User) => false, 
-  getUsers: async (bid: string) => [] as User[],
-  saveUser: async (user: User) => {},
-  deleteUser: async (id: string) => {},
-  getCustomers: async (bid: string) => [] as Customer[],
-  saveCustomer: async (c: Customer) => {},
-  deleteCustomer: async (id: string) => {},
-  getEmployees: async (bid: string) => [] as Employee[],
-  saveEmployee: async (e: Employee) => {},
-  deleteEmployee: async (id: string) => {},
-  getSuppliers: async (bid: string) => [] as Supplier[],
-  saveSupplier: async (s: Supplier) => {},
-  deleteSupplier: async (id: string) => {},
-  getExpenses: async (bid: string) => [] as Expense[],
-  addExpense: async (e: Expense) => {},
-  deleteExpense: async (id: string) => {},
-  getDashboardStats: async (bid: string) => ({ customerCount: 0, productCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0 }),
-  getSettings: async (bid: string) => ({ businessId: bid, currency: 'USD', currencySymbol: '$' }),
-  saveSettings: async (s: Settings) => {},
-  getNotifications: async (bid: string) => [] as Notification[],
-  saveNotification: async (n: Notification) => {},
-  markNotificationRead: async (id: string) => {}
-};
-
-seedData();
-
-export const Api = (USE_FIREBASE ? FirebaseService : MockService) as typeof MockService;
+export const Api = MockService;

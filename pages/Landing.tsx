@@ -177,8 +177,8 @@ export const Landing = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer group" onClick={() => window.scrollTo(0,0)}>
              {/* Circular Logo with reduced padding */}
-             <div className="relative w-9 h-9">
-                <div className="relative w-full h-full bg-primary rounded-full flex items-center justify-center border border-white/10 text-white font-bold text-lg pb-0.5">e</div>
+             <div className="relative w-7 h-7">
+                <div className="relative w-full h-full bg-primary rounded-full flex items-center justify-center border border-white/10 text-white font-bold text-base pb-0.5">e</div>
              </div>
              <span className="text-2xl font-bold tracking-tight text-white">ElifySIS</span>
           </div>
@@ -196,21 +196,21 @@ export const Landing = () => {
             </button>
           </div>
 
-          <button className="md:hidden text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-             {mobileMenuOpen ? <X /> : <Menu />}
+          <button className="md:hidden text-white p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
         
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-            <div className="md:hidden bg-slate-950 border-b border-white/10 p-4 absolute w-full">
+            <div className="md:hidden bg-slate-950/95 backdrop-blur-xl border-b border-white/10 p-4 absolute w-full shadow-2xl animate-in slide-in-from-top-2">
                 <div className="flex flex-col gap-4 text-center">
-                    <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white py-2">Features</a>
-                    <a href="#why-us" onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white py-2">Why Us</a>
-                    <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white py-2">Pricing</a>
-                    <hr className="border-white/10"/>
-                    <button onClick={() => navigate('/login')} className="text-white py-2 font-bold">Log In</button>
-                    <button onClick={() => navigate('/signup')} className="bg-primary text-white py-3 rounded-xl font-bold">Get Started</button>
+                    <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white py-2 text-lg">Features</a>
+                    <a href="#why-us" onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white py-2 text-lg">Why Us</a>
+                    <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white py-2 text-lg">Pricing</a>
+                    <hr className="border-white/10 my-2"/>
+                    <button onClick={() => navigate('/login')} className="text-white py-3 font-bold border border-white/10 rounded-xl hover:bg-white/5">Log In</button>
+                    <button onClick={() => navigate('/signup')} className="bg-primary text-white py-3 rounded-xl font-bold shadow-lg shadow-primary/20">Get Started</button>
                 </div>
             </div>
         )}
@@ -242,11 +242,11 @@ export const Landing = () => {
               <span className="block mt-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">like a pro.</span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-slate-400 mb-10 leading-relaxed max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+            <p className="text-lg md:text-2xl text-slate-400 mb-10 md:mb-16 leading-relaxed max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
               ElifySIS connects your sales, inventory, and finance in one beautiful, dark-mode enabled dashboard. Simple enough for beginners, powerful enough for enterprises.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-20 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 lg:mb-20 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
               <button onClick={() => navigate('/signup')} className="h-14 px-10 text-lg font-bold text-white bg-gradient-to-r from-primary to-accent rounded-full shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-105 flex items-center justify-center gap-2">
                   Get Started <ArrowRight size={20}/>
               </button>
@@ -276,10 +276,10 @@ export const Landing = () => {
         </div>
       </section>
 
-      {/* Platform Features - Reduced Spacing */}
-      <section id="features" className="pt-20 pb-32 bg-slate-950 relative">
+      {/* Platform Features - Mobile Spacing Adjusted */}
+      <section id="features" className="py-16 lg:pt-20 lg:pb-32 bg-slate-950 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-20">
+            <div className="text-center max-w-3xl mx-auto mb-12 lg:mb-20">
                 <h2 className="text-primary font-bold tracking-widest uppercase text-sm mb-3">PLATFORM FEATURES</h2>
                 <h3 className="text-3xl md:text-5xl font-bold text-white mb-6">Everything you need to grow.</h3>
                 <p className="text-slate-400 text-lg">We've consolidated all the tools you use into one seamless operating system.</p>
@@ -320,10 +320,10 @@ export const Landing = () => {
         </div>
       </section>
 
-      {/* Why Choose Us */}
-      <section id="why-us" className="py-24 bg-slate-900/30 border-y border-white/5">
+      {/* Why Choose Us - Mobile Spacing Adjusted */}
+      <section id="why-us" className="py-16 lg:py-24 bg-slate-900/30 border-y border-white/5">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-             <div className="text-center mb-16">
+             <div className="text-center mb-12 lg:mb-16">
                  <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Why retailers love ElifySIS</h2>
                  <p className="text-slate-400 text-lg max-w-2xl mx-auto">We don't just provide software; we provide a foundation for your business success.</p>
              </div>
@@ -350,11 +350,11 @@ export const Landing = () => {
          </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-32 relative">
+      {/* Pricing Section - Mobile Spacing Adjusted */}
+      <section id="pricing" className="py-16 lg:py-32 relative">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-             <div className="text-center max-w-3xl mx-auto mb-20">
-                 <h2 className="text-4xl font-bold text-white mb-6">Simple, Transparent Pricing</h2>
+             <div className="text-center max-w-3xl mx-auto mb-12 lg:mb-20">
+                 <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Simple, Transparent Pricing</h2>
                  <p className="text-slate-400 text-lg">No hidden fees. No credit card required for trial.</p>
              </div>
 
@@ -385,26 +385,27 @@ export const Landing = () => {
          </div>
       </section>
 
-      {/* Redesigned Testimonials Section */}
-      <section className="py-32 bg-gradient-to-b from-slate-900 to-slate-950 border-y border-white/5 relative overflow-hidden">
+      {/* Redesigned Testimonials Section - Grid Stacking Fix */}
+      <section className="py-16 lg:py-32 bg-gradient-to-b from-slate-900 to-slate-950 border-y border-white/5 relative overflow-hidden">
          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none"></div>
          
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-             <div className="text-center mb-16">
+             <div className="text-center mb-12 lg:mb-16">
                  <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Trusted by modern retailers</h2>
                  <p className="text-slate-400 text-lg">See what shop owners are saying about ElifySIS.</p>
              </div>
 
              <div className="relative mx-auto max-w-4xl">
-                 <div className="relative min-h-[300px]">
+                 {/* CSS Grid for Stacking - Fixes Mobile Height Issues */}
+                 <div className="grid grid-cols-1">
                      {testimonials.map((t, idx) => (
                          <div 
                              key={idx}
-                             className={`absolute inset-0 transition-all duration-700 ease-out transform ${
+                             className={`col-start-1 row-start-1 transition-all duration-700 ease-out transform ${
                                  idx === activeTestimonial 
                                  ? 'opacity-100 translate-y-0 scale-100 z-10' 
-                                 : 'opacity-0 translate-y-8 scale-95 -z-10'
+                                 : 'opacity-0 translate-y-8 scale-95 -z-10 pointer-events-none'
                              }`}
                          >
                              {/* Glass Card */}
@@ -425,7 +426,7 @@ export const Landing = () => {
                                      </div>
                                      
                                      <div className="text-center md:text-left flex-1">
-                                         <p className="text-xl md:text-2xl font-serif italic text-slate-200 leading-relaxed mb-6">
+                                         <p className="text-lg md:text-2xl font-serif italic text-slate-200 leading-relaxed mb-6">
                                              "{t.feedback}"
                                          </p>
                                          <div>
@@ -440,7 +441,7 @@ export const Landing = () => {
                  </div>
 
                  {/* Navigation Controls */}
-                 <div className="flex justify-center items-center gap-6 mt-4">
+                 <div className="flex justify-center items-center gap-6 mt-8 lg:mt-6">
                      <button 
                          onClick={() => setActiveTestimonial((prev) => (prev === 0 ? testimonials.length - 1 : prev - 1))}
                          className="p-3 rounded-full bg-slate-900 border border-white/10 text-slate-400 hover:text-white hover:border-primary/50 transition-all hover:scale-110"
@@ -469,10 +470,10 @@ export const Landing = () => {
          </div>
       </section>
 
-      {/* Improved Footer */}
-      <footer className="w-full bg-slate-950 pt-20 pb-10 border-t border-white/5">
+      {/* Improved Footer - Mobile Spacing Adjusted */}
+      <footer className="w-full bg-slate-950 pt-12 pb-8 lg:pt-20 lg:pb-10 border-t border-white/5">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 lg:gap-8 mb-16">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 mb-12 lg:mb-16">
                  
                  <div className="lg:col-span-2">
                      <div className="flex items-center gap-2 mb-6">
@@ -533,7 +534,7 @@ export const Landing = () => {
              </div>
 
              <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-                 <p className="text-slate-500 text-sm">© {new Date().getFullYear()} ElifySIS Inc. All rights reserved.</p>
+                 <p className="text-slate-500 text-sm text-center md:text-left">© {new Date().getFullYear()} ElifySIS Inc. All rights reserved.</p>
                  
                  <div className="flex items-center gap-2 bg-slate-900 py-2 px-4 rounded-full border border-white/5">
                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
