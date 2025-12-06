@@ -6,7 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/UI';
 import { 
   CheckCircle, BarChart, Zap, Shield, ArrowRight, 
-  Globe, TrendingUp, Layout, Smartphone, Cloud, Star, ChevronLeft, ChevronRight, Menu, X
+  Globe, TrendingUp, Layout, Smartphone, Cloud, Star, ChevronLeft, ChevronRight, Menu, X, Rocket, Heart, Layers,
+  Twitter, Facebook, Linkedin, Instagram, Mail, Quote, ArrowUp
 } from 'lucide-react';
 
 // --- Components ---
@@ -62,6 +63,7 @@ export const Landing = () => {
   const navigate = useNavigate();
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const testimonials = [
     { name: "Sarah Jenkins", role: "Bakery Owner", feedback: "ElifySIS transformed how we handle our morning rush. The interface is so intuitive my staff learned it in minutes.", img: "https://i.pravatar.cc/150?img=1" },
@@ -79,10 +81,30 @@ export const Landing = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Scroll to Top visibility
+  useEffect(() => {
+      const handleScroll = () => {
+          if (window.scrollY > 300) {
+              setShowScrollTop(true);
+          } else {
+              setShowScrollTop(false);
+          }
+      };
+      window.addEventListener('scroll', handleScroll);
+      return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-primary/30 selection:text-white overflow-x-hidden">
       
       <style>{`
+        html {
+            scroll-behavior: smooth;
+        }
         .glass-nav {
             background: rgba(2, 6, 23, 0.6);
             backdrop-filter: blur(8px);
@@ -143,14 +165,20 @@ export const Landing = () => {
         .text-glow {
             text-shadow: 0 0 40px rgba(26, 115, 232, 0.3);
         }
+
+        /* Custom Scroll Margin for sections to handle fixed header */
+        section {
+            scroll-margin-top: 100px;
+        }
       `}</style>
 
       {/* Navbar */}
       <nav className="fixed w-full z-50 glass-nav transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer group" onClick={() => window.scrollTo(0,0)}>
-             <div className="relative w-10 h-10">
-                <div className="relative w-full h-full bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center border border-white/10 text-white font-bold text-xl pb-1">e</div>
+             {/* Circular Logo with reduced padding */}
+             <div className="relative w-9 h-9">
+                <div className="relative w-full h-full bg-primary rounded-full flex items-center justify-center border border-white/10 text-white font-bold text-lg pb-0.5">e</div>
              </div>
              <span className="text-2xl font-bold tracking-tight text-white">ElifySIS</span>
           </div>
@@ -189,7 +217,7 @@ export const Landing = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+      <section className="relative pt-32 pb-16 lg:pt-48 lg:pb-24 overflow-hidden">
         {/* Animated Background */}
         <div className="grid-bg-container">
             <div className="grid-bg"></div>
@@ -220,7 +248,7 @@ export const Landing = () => {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-20 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
               <button onClick={() => navigate('/signup')} className="h-14 px-10 text-lg font-bold text-white bg-gradient-to-r from-primary to-accent rounded-full shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-105 flex items-center justify-center gap-2">
-                  Start Free Trial <ArrowRight size={20}/>
+                  Get Started <ArrowRight size={20}/>
               </button>
               <button onClick={() => navigate('/login')} className="h-14 px-10 text-lg font-bold text-white bg-slate-900 border border-white/10 hover:bg-slate-800 rounded-full transition-all flex items-center justify-center">
                   Live Demo
@@ -248,11 +276,11 @@ export const Landing = () => {
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="py-32 bg-slate-950 relative">
+      {/* Platform Features - Reduced Spacing */}
+      <section id="features" className="pt-20 pb-32 bg-slate-950 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-20">
-                <h2 className="text-primary font-bold tracking-widest uppercase text-sm mb-3">Features</h2>
+                <h2 className="text-primary font-bold tracking-widest uppercase text-sm mb-3">PLATFORM FEATURES</h2>
                 <h3 className="text-3xl md:text-5xl font-bold text-white mb-6">Everything you need to grow.</h3>
                 <p className="text-slate-400 text-lg">We've consolidated all the tools you use into one seamless operating system.</p>
             </div>
@@ -293,37 +321,31 @@ export const Landing = () => {
       </section>
 
       {/* Why Choose Us */}
-      <section id="why-us" className="py-24 bg-slate-900/50 border-y border-white/5">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-16">
-             <div className="flex-1 space-y-8">
-                 <h2 className="text-4xl font-bold text-white">Why retailers love ElifySIS</h2>
-                 <div className="space-y-6">
-                     <div className="flex gap-4 group">
-                         <div className="mt-1"><div className="w-10 h-10 rounded-full bg-slate-800 group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-colors flex items-center justify-center font-bold border border-white/10">1</div></div>
-                         <div>
-                             <h4 className="text-xl font-bold text-white mb-2">Setup in minutes, not days.</h4>
-                             <p className="text-slate-400">No complex hardware requirements. Just sign up and start selling immediately.</p>
-                         </div>
-                     </div>
-                     <div className="flex gap-4 group">
-                         <div className="mt-1"><div className="w-10 h-10 rounded-full bg-slate-800 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors flex items-center justify-center font-bold border border-white/10">2</div></div>
-                         <div>
-                             <h4 className="text-xl font-bold text-white mb-2">Designed for humans.</h4>
-                             <p className="text-slate-400">Our UI is crafted to reduce eye strain and cognitive load, making long shifts easier.</p>
-                         </div>
-                     </div>
-                     <div className="flex gap-4 group">
-                         <div className="mt-1"><div className="w-10 h-10 rounded-full bg-slate-800 group-hover:bg-pink-500/20 group-hover:text-pink-400 transition-colors flex items-center justify-center font-bold border border-white/10">3</div></div>
-                         <div>
-                             <h4 className="text-xl font-bold text-white mb-2">Scales with you.</h4>
-                             <p className="text-slate-400">From a single kiosk to a multi-location chain, ElifySIS handles it all effortlessly.</p>
-                         </div>
-                     </div>
-                 </div>
+      <section id="why-us" className="py-24 bg-slate-900/30 border-y border-white/5">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+             <div className="text-center mb-16">
+                 <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Why retailers love ElifySIS</h2>
+                 <p className="text-slate-400 text-lg max-w-2xl mx-auto">We don't just provide software; we provide a foundation for your business success.</p>
              </div>
-             <div className="flex-1 relative">
-                 <div className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600 rounded-full blur-[100px] opacity-20"></div>
-                 <img src="https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&q=80&w=1000" alt="Happy customer" className="relative rounded-2xl shadow-2xl border border-white/10 w-full" />
+
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                 <div className="bg-slate-900 rounded-3xl p-8 border border-white/5 hover:border-primary/50 transition-colors">
+                     <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary mb-6"><Rocket size={24}/></div>
+                     <h3 className="text-xl font-bold text-white mb-4">Setup in minutes</h3>
+                     <p className="text-slate-400">Forget complex hardware requirements and lengthy training sessions. ElifySIS is browser-based and designed to be picked up instantly.</p>
+                 </div>
+
+                 <div className="bg-slate-900 rounded-3xl p-8 border border-white/5 hover:border-pink-500/50 transition-colors">
+                     <div className="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center text-pink-400 mb-6"><Heart size={24}/></div>
+                     <h3 className="text-xl font-bold text-white mb-4">Designed for humans</h3>
+                     <p className="text-slate-400">Our UI reduces eye strain and cognitive load, making long retail shifts significantly easier for your staff.</p>
+                 </div>
+
+                 <div className="bg-slate-900 rounded-3xl p-8 border border-white/5 hover:border-blue-500/50 transition-colors">
+                     <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 mb-6"><Layers size={24}/></div>
+                     <h3 className="text-xl font-bold text-white mb-4">Scales with you</h3>
+                     <p className="text-slate-400">From a single kiosk to a multi-location chain, ElifySIS handles complex inventory structures effortlessly.</p>
+                 </div>
              </div>
          </div>
       </section>
@@ -336,14 +358,7 @@ export const Landing = () => {
                  <p className="text-slate-400 text-lg">No hidden fees. No credit card required for trial.</p>
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                 <PricingCard 
-                    title="Demo" 
-                    price="$0" 
-                    period="forever"
-                    features={['Single User', '50 Products Limit', 'Basic Dashboard', 'Community Support']} 
-                    onAction={() => navigate('/signup')}
-                 />
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                  <PricingCard 
                     title="Monthly" 
                     price="$10" 
@@ -370,99 +385,115 @@ export const Landing = () => {
          </div>
       </section>
 
-      {/* Testimonials Carousel */}
-      <section className="py-32 bg-slate-900 border-y border-white/5 relative overflow-hidden">
-         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
-         <div className="max-w-4xl mx-auto px-4 relative z-10 text-center">
-            <h2 className="text-3xl font-bold text-white mb-16">Trusted by businesses like yours</h2>
-            
-            <div className="relative min-h-[300px]">
-                {testimonials.map((t, idx) => (
-                    <div 
-                        key={idx}
-                        className={`absolute top-0 left-0 w-full transition-all duration-700 ease-in-out transform ${
-                            idx === activeTestimonial 
-                            ? 'opacity-100 translate-x-0 scale-100' 
-                            : 'opacity-0 translate-x-12 scale-95 pointer-events-none'
-                        }`}
-                    >
-                        <div className="flex flex-col items-center">
-                            <div className="mb-8 relative">
-                                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full"></div>
-                                <img src={t.img} alt={t.name} className="w-24 h-24 rounded-full border-4 border-slate-800 shadow-xl relative z-10" />
-                                <div className="absolute -bottom-2 -right-2 bg-slate-800 p-2 rounded-full border border-white/10 z-20">
-                                    <div className="flex text-amber-400">
-                                        {[1,2,3,4,5].map(i => <Star key={i} size={10} fill="currentColor" />)}
-                                    </div>
-                                </div>
-                            </div>
-                            <blockquote className="text-2xl md:text-3xl text-slate-300 font-medium leading-relaxed mb-8 max-w-2xl mx-auto">
-                                "{t.feedback}"
-                            </blockquote>
-                            <div className="text-center">
-                                <h4 className="text-xl font-bold text-white">{t.name}</h4>
-                                <p className="text-primary font-medium">{t.role}</p>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+      {/* Redesigned Testimonials Section */}
+      <section className="py-32 bg-gradient-to-b from-slate-900 to-slate-950 border-y border-white/5 relative overflow-hidden">
+         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
+         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none"></div>
+         
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+             <div className="text-center mb-16">
+                 <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Trusted by modern retailers</h2>
+                 <p className="text-slate-400 text-lg">See what shop owners are saying about ElifySIS.</p>
+             </div>
 
-            {/* Carousel Controls */}
-            <div className="flex justify-center items-center gap-4 mt-8">
-                <button 
-                    onClick={() => setActiveTestimonial((prev) => (prev === 0 ? testimonials.length - 1 : prev - 1))}
-                    className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-white/5"
-                >
-                    <ChevronLeft size={20} />
-                </button>
-                <div className="flex gap-2">
-                    {testimonials.map((_, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => setActiveTestimonial(idx)}
-                            className={`transition-all duration-300 rounded-full ${
-                                idx === activeTestimonial ? 'w-8 h-2 bg-primary' : 'w-2 h-2 bg-slate-700 hover:bg-slate-600'
-                            }`}
-                        />
-                    ))}
-                </div>
-                <button 
-                    onClick={() => setActiveTestimonial((prev) => (prev + 1) % testimonials.length)}
-                    className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-white/5"
-                >
-                    <ChevronRight size={20} />
-                </button>
-            </div>
-         </div>
-      </section>
+             <div className="relative mx-auto max-w-4xl">
+                 <div className="relative min-h-[300px]">
+                     {testimonials.map((t, idx) => (
+                         <div 
+                             key={idx}
+                             className={`absolute inset-0 transition-all duration-700 ease-out transform ${
+                                 idx === activeTestimonial 
+                                 ? 'opacity-100 translate-y-0 scale-100 z-10' 
+                                 : 'opacity-0 translate-y-8 scale-95 -z-10'
+                             }`}
+                         >
+                             {/* Glass Card */}
+                             <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 md:p-12 shadow-2xl overflow-hidden">
+                                 {/* Background Decoration */}
+                                 <Quote className="absolute top-8 left-8 text-white/5 transform scale-[3] -rotate-12" size={64} />
+                                 <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-full blur-3xl"></div>
+                                 
+                                 <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 relative z-10">
+                                     <div className="flex-shrink-0">
+                                         <div className="relative w-28 h-28 md:w-32 md:h-32">
+                                             <div className="absolute inset-0 bg-gradient-to-br from-primary to-purple-500 rounded-full animate-spin-slow opacity-50 blur-md"></div>
+                                             <img src={t.img} alt={t.name} className="relative w-full h-full object-cover rounded-full border-4 border-slate-900 shadow-xl" />
+                                             <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-slate-900 px-3 py-1 rounded-full border border-white/10 flex gap-1">
+                                                 {[1,2,3,4,5].map(i => <Star key={i} size={12} className="fill-amber-400 text-amber-400" />)}
+                                             </div>
+                                         </div>
+                                     </div>
+                                     
+                                     <div className="text-center md:text-left flex-1">
+                                         <p className="text-xl md:text-2xl font-serif italic text-slate-200 leading-relaxed mb-6">
+                                             "{t.feedback}"
+                                         </p>
+                                         <div>
+                                             <h4 className="text-lg font-bold text-white">{t.name}</h4>
+                                             <p className="text-primary font-medium">{t.role}</p>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
 
-      {/* Footer */}
-      <footer className="w-full bg-slate-950 pt-20 border-t border-white/5">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-             <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-white/10 rounded-3xl p-12 text-center relative overflow-hidden mb-20 shadow-2xl group">
-                 <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/20 transition-all duration-1000"></div>
-                 <div className="relative z-10">
-                     <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Ready to modernize your store?</h2>
-                     <p className="text-slate-400 text-lg mb-10 max-w-2xl mx-auto">Join thousands of retailers who trust ElifySIS to run their business smoothly and efficiently. Start your free trial today.</p>
-                     <button onClick={() => navigate('/signup')} className="bg-white text-slate-950 px-8 py-4 rounded-full font-bold text-lg shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:scale-105 transition-all">
-                         Get Started Now
+                 {/* Navigation Controls */}
+                 <div className="flex justify-center items-center gap-6 mt-4">
+                     <button 
+                         onClick={() => setActiveTestimonial((prev) => (prev === 0 ? testimonials.length - 1 : prev - 1))}
+                         className="p-3 rounded-full bg-slate-900 border border-white/10 text-slate-400 hover:text-white hover:border-primary/50 transition-all hover:scale-110"
+                     >
+                         <ChevronLeft size={20} />
+                     </button>
+                     <div className="flex gap-3">
+                         {testimonials.map((_, idx) => (
+                             <button
+                                 key={idx}
+                                 onClick={() => setActiveTestimonial(idx)}
+                                 className={`h-1.5 rounded-full transition-all duration-300 ${
+                                     idx === activeTestimonial ? 'w-8 bg-gradient-to-r from-primary to-purple-500' : 'w-2 bg-slate-700 hover:bg-slate-600'
+                                 }`}
+                             />
+                         ))}
+                     </div>
+                     <button 
+                         onClick={() => setActiveTestimonial((prev) => (prev + 1) % testimonials.length)}
+                         className="p-3 rounded-full bg-slate-900 border border-white/10 text-slate-400 hover:text-white hover:border-primary/50 transition-all hover:scale-110"
+                     >
+                         <ChevronRight size={20} />
                      </button>
                  </div>
              </div>
+         </div>
+      </section>
 
-             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-12 border-b border-white/5">
-                 <div className="col-span-2 lg:col-span-2">
+      {/* Improved Footer */}
+      <footer className="w-full bg-slate-950 pt-20 pb-10 border-t border-white/5">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 lg:gap-8 mb-16">
+                 
+                 <div className="lg:col-span-2">
                      <div className="flex items-center gap-2 mb-6">
-                         <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center text-white font-bold border border-white/20">E</div>
-                         <span className="text-xl font-bold text-white">ElifySIS</span>
+                         <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold border border-white/20 pb-0.5">e</div>
+                         <span className="text-2xl font-bold text-white tracking-tight">ElifySIS</span>
                      </div>
-                     <p className="text-slate-500 text-sm leading-relaxed mb-6 max-w-xs">
-                         The operating system for modern retail. Built by developers, loved by shop owners across the globe.
+                     <p className="text-slate-400 text-sm leading-relaxed mb-8 max-w-sm">
+                         The operating system for modern retail. Built with precision for shop owners, managers, and cashiers across the globe.
                      </p>
                      <div className="flex gap-4">
-                         <a href="#" className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 hover:text-white hover:bg-primary/20 transition-all border border-white/5">
-                             <Globe size={18} />
+                         <a href="#" className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 hover:text-white hover:bg-primary transition-all duration-300">
+                             <Twitter size={18} />
+                         </a>
+                         <a href="#" className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 hover:text-white hover:bg-primary transition-all duration-300">
+                             <Linkedin size={18} />
+                         </a>
+                         <a href="#" className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 hover:text-white hover:bg-primary transition-all duration-300">
+                             <Facebook size={18} />
+                         </a>
+                         <a href="#" className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 hover:text-white hover:bg-primary transition-all duration-300">
+                             <Instagram size={18} />
                          </a>
                      </div>
                  </div>
@@ -474,6 +505,7 @@ export const Landing = () => {
                          <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
                          <li><a href="#" className="hover:text-primary transition-colors">Integrations</a></li>
                          <li><a href="#" className="hover:text-primary transition-colors">Updates</a></li>
+                         <li><a href="#" className="hover:text-primary transition-colors">Roadmap</a></li>
                      </ul>
                  </div>
                  
@@ -484,6 +516,7 @@ export const Landing = () => {
                          <li><a href="#" className="hover:text-primary transition-colors">Careers</a></li>
                          <li><a href="#" className="hover:text-primary transition-colors">Blog</a></li>
                          <li><a href="#" className="hover:text-primary transition-colors">Contact</a></li>
+                         <li><a href="#" className="hover:text-primary transition-colors">Partners</a></li>
                      </ul>
                  </div>
                  
@@ -492,21 +525,34 @@ export const Landing = () => {
                      <ul className="space-y-4 text-sm text-slate-400">
                          <li><a href="#" className="hover:text-primary transition-colors">Help Center</a></li>
                          <li><a href="#" className="hover:text-primary transition-colors">API Docs</a></li>
+                         <li><a href="#" className="hover:text-primary transition-colors">System Status</a></li>
                          <li><a href="#" className="hover:text-primary transition-colors">Privacy Policy</a></li>
                          <li><a href="#" className="hover:text-primary transition-colors">Terms of Service</a></li>
                      </ul>
                  </div>
              </div>
-             
-             <div className="py-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-600">
-                 <p>© {new Date().getFullYear()} ElifySIS Inc. All rights reserved.</p>
-                 <div className="flex items-center gap-2">
-                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                     <span>All systems operational</span>
+
+             <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+                 <p className="text-slate-500 text-sm">© {new Date().getFullYear()} ElifySIS Inc. All rights reserved.</p>
+                 
+                 <div className="flex items-center gap-2 bg-slate-900 py-2 px-4 rounded-full border border-white/5">
+                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                     <span className="text-xs font-medium text-slate-300">All Systems Operational</span>
                  </div>
              </div>
          </div>
       </footer>
+
+      {/* Scroll to Top Button */}
+      <button 
+          onClick={scrollToTop}
+          className={`fixed bottom-8 right-8 p-4 rounded-full bg-primary text-white shadow-xl shadow-primary/30 z-50 transition-all duration-300 hover:scale-110 hover:-translate-y-1 ${
+              showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
+          }`}
+          aria-label="Scroll to top"
+      >
+          <ArrowUp size={24} />
+      </button>
     </div>
   );
 };
