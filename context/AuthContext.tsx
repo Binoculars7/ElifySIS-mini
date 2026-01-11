@@ -8,8 +8,8 @@ import { Api } from '../services/api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (username: string, email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{success: boolean, error?: string}>;
+  signup: (username: string, email: string, password: string) => Promise<{success: boolean, error?: string}>;
   logout: () => void;
   hasRole: (allowedRoles: UserRole[]) => boolean;
 }
@@ -21,7 +21,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check local storage for persistent session simulation
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
@@ -29,28 +28,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{success: boolean, error?: string}> => {
     try {
       const user = await Api.login(email, password);
       if (user) {
         setUser(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch (e) {
-      console.error(e);
-      return false;
+      return { success: false, error: 'User not found.' };
+    } catch (e: any) {
+      return { success: false, error: e.message };
     }
   };
 
-  const signup = async (username: string, email: string, password: string): Promise<boolean> => {
+  const signup = async (username: string, email: string, password: string): Promise<{success: boolean, error?: string}> => {
       try {
-          // Generate a new Business ID for the registering admin
           const newBusinessId = `biz_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
           
           const newUser: User = {
-              id: Math.random().toString(36).substr(2, 9),
+              id: '', // Will be set by Firebase Auth UID in API
               businessId: newBusinessId,
               username,
               email,
@@ -61,14 +58,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
           const success = await Api.signup(newUser);
           if (success) {
+              // Note: newUser.id is updated inside Api.signup
               setUser(newUser);
               localStorage.setItem('currentUser', JSON.stringify(newUser));
-              return true;
+              return { success: true };
           }
-          return false;
-      } catch (e) {
-          console.error(e);
-          return false;
+          return { success: false, error: 'Registration failed.' };
+      } catch (e: any) {
+          return { success: false, error: e.message };
       }
   };
 

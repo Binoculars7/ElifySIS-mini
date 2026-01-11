@@ -1,5 +1,4 @@
 
-
 export type UserRole = 'ADMIN' | 'CASHIER' | 'MANAGER' | 'SALES';
 
 export interface User {
@@ -14,6 +13,12 @@ export interface User {
 }
 
 export interface Category {
+  id: string;
+  businessId: string;
+  name: string;
+}
+
+export interface ExpenseCategory {
   id: string;
   businessId: string;
   name: string;

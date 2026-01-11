@@ -44,7 +44,7 @@ export const Sales = () => {
   const [receiptError, setReceiptError] = useState('');
   const [salesHistory, setSalesHistory] = useState<Sale[]>([]);
 
-  const ITEMS_PER_PAGE = 20;
+  const ITEMS_PER_PAGE = 24;
 
   useEffect(() => {
     loadData();
@@ -89,9 +89,21 @@ export const Sales = () => {
 
   const addToCart = (productId: string) => {
     const prod = products.find(p => p.id === productId);
-    if (!prod || prod.quantity <= 0) return;
+    if (!prod) return;
+
+    if (prod.quantity <= 0) {
+      notify(`Insufficient stock for ${prod.name}. Product is out of stock.`, 'error', 'Out of Stock');
+      return;
+    }
 
     const existing = cart.find(item => item.productId === productId);
+    const currentQtyInCart = existing ? existing.quantity : 0;
+
+    if (currentQtyInCart + 1 > prod.quantity) {
+      notify(`Cannot add more ${prod.name}. Only ${prod.quantity} available in stock.`, 'error', 'Stock Limit Reached');
+      return;
+    }
+
     if (existing) {
       setCart(cart.map(item => item.productId === productId ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.cost } : item));
     } else {
@@ -103,7 +115,16 @@ export const Sales = () => {
     const existing = cart.find(item => item.productId === productId);
     if (!existing) return;
 
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+
     const newQty = existing.quantity + delta;
+
+    if (delta > 0 && newQty > prod.quantity) {
+      notify(`Cannot exceed available stock of ${prod.quantity} for ${prod.name}.`, 'error', 'Stock Limit Reached');
+      return;
+    }
+
     if (newQty <= 0) {
       setCart(cart.filter(c => c.productId !== productId));
     } else {
@@ -248,40 +269,40 @@ export const Sales = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Tab Switcher */}
-      <div className="bg-white dark:bg-slate-800 p-2 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 inline-flex flex-wrap gap-2 transition-colors">
+      <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 inline-flex flex-wrap gap-1.5 transition-colors">
          {canViewEntry && (
-         <button onClick={() => setActiveTab('entry')} className={`px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-all ${activeTab === 'entry' ? 'bg-primary text-white shadow-md' : 'text-textSecondary dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><ShoppingCart size={18} /> Sales Entry</button>
+         <button onClick={() => setActiveTab('entry')} className={`px-5 py-1.5 rounded-lg font-bold flex items-center gap-2 transition-all ${activeTab === 'entry' ? 'bg-primary text-white shadow-md' : 'text-textSecondary dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><ShoppingCart size={16} /> Sales Entry</button>
          )}
          {canViewCashier && (
-         <button onClick={() => setActiveTab('cashier')} className={`px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-all ${activeTab === 'cashier' ? 'bg-primary text-white shadow-md' : 'text-textSecondary dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><Banknote size={18} /> Cashier Station</button>
+         <button onClick={() => setActiveTab('cashier')} className={`px-5 py-1.5 rounded-lg font-bold flex items-center gap-2 transition-all ${activeTab === 'cashier' ? 'bg-primary text-white shadow-md' : 'text-textSecondary dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><Banknote size={16} /> Cashier Station</button>
          )}
          {canViewReceipts && (
-         <button onClick={() => setActiveTab('receipts')} className={`px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-all ${activeTab === 'receipts' ? 'bg-primary text-white shadow-md' : 'text-textSecondary dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><FileText size={18} /> Receipts</button>
+         <button onClick={() => setActiveTab('receipts')} className={`px-5 py-1.5 rounded-lg font-bold flex items-center gap-2 transition-all ${activeTab === 'receipts' ? 'bg-primary text-white shadow-md' : 'text-textSecondary dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><FileText size={16} /> Receipts</button>
          )}
       </div>
 
       {activeTab === 'entry' && canViewEntry && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+            <div className="md:col-span-7 lg:col-span-8 space-y-4">
                 <div className="relative">
-                    <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+                    <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                     <Input placeholder="Search products..." className="pl-10" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}/>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 min-h-[500px] content-start">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 min-h-[500px] content-start">
                     {displayedProducts.map(p => (
-                        <div key={p.id} onClick={() => addToCart(p.id)} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 cursor-pointer hover:border-primary hover:shadow-md transition-all group flex flex-col justify-between">
+                        <div key={p.id} onClick={() => addToCart(p.id)} className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 cursor-pointer hover:border-primary hover:shadow-md transition-all group flex flex-col justify-between">
                             <div>
-                                <div className="h-20 bg-gray-50 dark:bg-slate-700 rounded-lg mb-3 flex items-center justify-center text-gray-300 dark:text-gray-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-400 transition-colors">
-                                    <ShoppingCart size={24}/>
+                                <div className="h-16 bg-gray-50 dark:bg-slate-700 rounded-lg mb-2 flex items-center justify-center text-gray-300 dark:text-gray-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:text-blue-400 transition-colors">
+                                    <ShoppingCart size={20}/>
                                 </div>
-                                <h4 className="font-bold text-sm line-clamp-2 mb-1 text-gray-900 dark:text-gray-100">{p.name}</h4>
-                                <p className="text-xs text-textSecondary dark:text-gray-400 mb-2">{p.category}</p>
+                                <h4 className="font-bold text-xs line-clamp-2 mb-1 text-gray-900 dark:text-gray-100">{p.name}</h4>
+                                <p className="text-[10px] text-textSecondary dark:text-gray-400 mb-2">{p.category}</p>
                             </div>
                             <div className="flex justify-between items-end">
-                                <span className="text-primary font-bold text-lg">{formatCurrency(p.sellPrice)}</span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded ${p.quantity > 10 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{p.quantity} left</span>
+                                <span className="text-primary font-bold text-base">{formatCurrency(p.sellPrice)}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${p.quantity > 10 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{p.quantity}</span>
                             </div>
                         </div>
                     ))}
@@ -289,57 +310,60 @@ export const Sales = () => {
                 </div>
                 {totalPages > 1 && (
                     <div className="flex justify-center gap-2 mt-4">
-                        <Button variant="secondary" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
-                        <span className="flex items-center px-4 font-medium bg-white dark:bg-slate-800 dark:text-white rounded-lg border border-gray-200 dark:border-slate-700">Page {currentPage} of {totalPages}</span>
-                        <Button variant="secondary" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
+                        <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
+                        <span className="flex items-center px-4 text-sm font-medium bg-white dark:bg-slate-800 dark:text-white rounded-lg border border-gray-200 dark:border-slate-700">Page {currentPage} of {totalPages}</span>
+                        <Button variant="secondary" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
                     </div>
                 )}
             </div>
 
-            <div className="relative">
-                <Card className="sticky top-4 h-[85vh] flex flex-col">
+            <div className="md:col-span-5 lg:col-span-4 relative">
+                <Card className="sticky top-4 h-auto max-h-[85vh] flex flex-col p-3 transition-all">
                     {!generatedTicketId ? (
                         <>
-                            <div className="mb-4">
-                                <h3 className="text-xl font-bold flex items-center gap-2 text-textPrimary dark:text-white"><ShoppingCart /> New Order</h3>
-                                <p className="text-xs text-textSecondary dark:text-gray-400 mt-1">Add items and generate a ticket ID.</p>
+                            <div className="mb-2">
+                                <h3 className="text-lg font-bold flex items-center gap-2 text-textPrimary dark:text-white leading-tight"><ShoppingCart size={20}/> New Order</h3>
+                                <p className="text-[10px] text-textSecondary dark:text-gray-400 mt-0.5">Add items and generate ticket.</p>
                             </div>
-                            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                            <div className="overflow-y-auto space-y-1.5 pr-1 custom-scrollbar max-h-[50vh]">
                                 {cart.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 space-y-4">
-                                        <div className="p-4 bg-gray-50 dark:bg-slate-700 rounded-full"><Plus size={32}/></div>
-                                        <p>Select products to begin</p>
+                                    <div className="flex flex-col items-center justify-center py-10 text-gray-400 dark:text-gray-500 space-y-2 opacity-60">
+                                        <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded-full"><Plus size={24}/></div>
+                                        <p className="text-sm">Select products to begin</p>
                                     </div>
                                 )}
                                 {cart.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700 p-3 rounded-lg border border-gray-100 dark:border-slate-600">
-                                        <div className="flex-1">
-                                            <p className="font-medium text-sm text-textPrimary dark:text-gray-100">{item.productName}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{formatCurrency(item.cost)}/each</p>
+                                    <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700 p-2 rounded-lg border border-gray-100 dark:border-slate-600">
+                                        <div className="flex-1 min-w-0 pr-1">
+                                            <p className="font-bold text-[11px] text-textPrimary dark:text-gray-100 truncate">{item.productName}</p>
+                                            <p className="text-[9px] text-gray-500 dark:text-gray-400">{formatCurrency(item.cost)}</p>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <button onClick={() => updateQuantity(item.productId, -1)} className="p-1 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm text-gray-600 dark:text-gray-300"><Minus size={14}/></button>
-                                            <span className="font-bold text-sm w-4 text-center text-textPrimary dark:text-white">{item.quantity}</span>
-                                            <button onClick={() => updateQuantity(item.productId, 1)} className="p-1 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm text-gray-600 dark:text-gray-300"><Plus size={14}/></button>
+                                        <div className="flex items-center gap-1.5 mr-1 shrink-0">
+                                            <button onClick={() => updateQuantity(item.productId, -1)} className="p-0.5 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm text-gray-600 dark:text-gray-300"><Minus size={12}/></button>
+                                            <span className="font-bold text-[11px] w-3 text-center text-textPrimary dark:text-white">{item.quantity}</span>
+                                            <button onClick={() => updateQuantity(item.productId, 1)} className="p-0.5 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm text-gray-600 dark:text-gray-300"><Plus size={12}/></button>
                                         </div>
-                                        <div className="w-16 text-right font-bold text-sm text-primary">{formatCurrency(item.total)}</div>
+                                        <div className="min-w-[70px] text-right font-bold text-[11px] text-primary shrink-0">{formatCurrency(item.total)}</div>
                                     </div>
                                 ))}
                             </div>
-                            <div className="border-t dark:border-slate-700 pt-4 mt-4 space-y-4 bg-white dark:bg-slate-800">
-                                <div className="flex justify-between text-xl font-bold text-textPrimary dark:text-white"><span>Total</span> <span>{formatCurrency(cart.reduce((a, c) => a + c.total, 0))}</span></div>
-                                <Button onClick={generateTicket} disabled={cart.length === 0} className="w-full py-4 text-lg shadow-lg shadow-primary/20">Generate Ticket ID <ArrowRight className="ml-2"/></Button>
+                            <div className="border-t dark:border-slate-700 pt-2 mt-2 bg-white dark:bg-slate-800">
+                                <div className="flex justify-between text-base font-black text-textPrimary dark:text-white mb-2">
+                                    <span>Total</span> 
+                                    <span>{formatCurrency(cart.reduce((a, c) => a + c.total, 0))}</span>
+                                </div>
+                                <Button onClick={generateTicket} disabled={cart.length === 0} className="w-full py-2.5 text-sm font-bold shadow-lg shadow-primary/20">Generate Ticket ID <ArrowRight className="ml-1" size={16}/></Button>
                             </div>
                         </>
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center space-y-6 animate-in zoom-in duration-300">
-                            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center shadow-inner"><User size={40} /></div>
+                        <div className="flex flex-col items-center justify-center py-10 text-center space-y-4 animate-in zoom-in duration-300">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center shadow-inner"><User size={32} /></div>
                             <div>
-                                <h3 className="text-gray-500 dark:text-gray-400 font-medium">Customer Ticket ID</h3>
-                                <h1 className="text-4xl font-black text-primary tracking-wider my-2">{generatedTicketId}</h1>
-                                <p className="text-sm text-gray-400">Please direct the customer to the cashier.</p>
+                                <h3 className="text-gray-500 dark:text-gray-400 font-medium text-sm">Customer Ticket ID</h3>
+                                <h1 className="text-3xl font-black text-primary tracking-wider my-1">{generatedTicketId}</h1>
+                                <p className="text-xs text-gray-400">Please direct the customer to the cashier.</p>
                             </div>
-                            <Button onClick={resetEntry} variant="secondary" className="mt-8">Start New Order</Button>
+                            <Button onClick={resetEntry} variant="secondary" className="mt-4">Start New Order</Button>
                         </div>
                     )}
                 </Card>
@@ -348,8 +372,8 @@ export const Sales = () => {
       )}
 
       {activeTab === 'cashier' && canViewCashier && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div className="md:col-span-7 lg:col-span-8">
                  <Card className="h-full">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-xl font-bold flex items-center gap-2 text-textPrimary dark:text-white"><RefreshCcw size={20}/> Pending Orders</h3>
@@ -377,7 +401,7 @@ export const Sales = () => {
                     </div>
                  </Card>
               </div>
-              <div>
+              <div className="md:col-span-5 lg:col-span-4">
                   <Card className="h-full sticky top-4 flex flex-col">
                       {selectedOrder ? (
                           <>
@@ -452,8 +476,8 @@ export const Sales = () => {
              )}
 
              {searchedReceipt && (
-                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
-                     <div className="lg:col-span-8 bg-gray-100 dark:bg-slate-700 rounded-xl border border-gray-200 dark:border-slate-600 p-8 flex justify-center items-start min-h-[600px] shadow-inner">
+                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mt-6">
+                     <div className="md:col-span-7 lg:col-span-8 bg-gray-100 dark:bg-slate-700 rounded-xl border border-gray-200 dark:border-slate-600 p-8 flex justify-center items-start min-h-[600px] shadow-inner">
                          {/* Receipt Preview - Force Light Mode Look */}
                          <div id="receipt-preview" className="bg-white dark:bg-white w-80 shadow-2xl relative text-gray-900 dark:text-gray-900 font-mono text-sm leading-tight transform transition-transform hover:scale-[1.01] duration-300">
                              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-b from-gray-100 to-white opacity-50"></div>
@@ -488,7 +512,7 @@ export const Sales = () => {
                              <div className="h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAxMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHBhdGggZD0iTTAgMTBMMTAgMEwyMCAxMFoiIGZpbGw9IndoaXRlIi8+PC9zdmc+')] bg-repeat-x bg-bottom w-full absolute -bottom-4 left-0"></div>
                          </div>
                      </div>
-                     <div className="lg:col-span-4 space-y-6">
+                     <div className="md:col-span-5 lg:col-span-4 space-y-6">
                          <Card className="sticky top-6">
                              <div className="mb-6"><h3 className="font-bold text-lg text-textPrimary dark:text-white mb-1">Receipt Actions</h3><p className="text-sm text-textSecondary dark:text-gray-400">Manage output for Ticket #{searchedReceipt.ticketId}</p></div>
                              <div className="space-y-4"><Button onClick={() => printReceiptElement('receipt-preview')} className="w-full h-12 text-lg"><Printer size={20} className="mr-2"/> Print Receipt</Button><Button onClick={() => printReceiptElement('receipt-preview')} variant="secondary" className="w-full h-12 text-lg"><Download size={20} className="mr-2"/> Download PDF</Button><Button onClick={() => setSearchedReceipt(null)} variant="ghost" className="w-full">Back to History</Button></div>

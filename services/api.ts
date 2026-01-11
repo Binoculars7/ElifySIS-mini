@@ -1,382 +1,529 @@
+
 import { 
-  Product, Customer, Employee, Supplier, Sale, Expense, User, UserRole, StockLog, Category, Settings, Notification
+  Product, Customer, Employee, Supplier, Sale, Expense, User, UserRole, StockLog, Category, ExpenseCategory, Settings, Notification
 } from '../types';
+import { initializeApp, getApp, getApps, FirebaseApp, deleteApp } from 'firebase/app';
+import { 
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut 
+} from 'firebase/auth';
+import { 
+  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, writeBatch, orderBy 
+} from 'firebase/firestore';
 
 // ==========================================
-// MOCK SERVICE IMPLEMENTATION
-// Replaces Firebase with LocalStorage for development stability
+// CONFIGURATION
 // ==========================================
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const USE_FIREBASE = true;
 
-const getCollection = <T>(collectionName: string): T[] => {
-  const data = localStorage.getItem(`elifysis_${collectionName}`);
-  return data ? JSON.parse(data) : [];
+// IMPORTANT: Update this object with the config from your Firebase Console
+const firebaseConfig = {
+  apiKey: "AIzaSyBjIWvN9F8I8uzy8h_EPCxlNTDbwfPk-1g",
+  authDomain: "elifysis.firebaseapp.com",
+  projectId: "elifysis",
+  storageBucket: "elifysis.firebasestorage.app",
+  messagingSenderId: "526762118474",
+  appId: "1:526762118474:web:c55efccd11d584959005b3"
 };
 
-const saveCollection = <T>(collectionName: string, data: T[]) => {
-  localStorage.setItem(`elifysis_${collectionName}`, JSON.stringify(data));
-};
+// ==========================================
+// FIREBASE INITIALIZATION
+// ==========================================
 
-// Seed initial data if empty
-const seedData = () => {
-    if (!localStorage.getItem('elifysis_users')) {
-        const adminUser: User = {
-            id: 'admin_1',
-            businessId: 'biz_default',
-            username: 'Admin User',
-            email: 'admin@store.com',
-            role: 'ADMIN',
-            isActive: true,
-            createdAt: Date.now()
-        };
-        saveCollection('users', [adminUser]);
+let app: FirebaseApp;
+let auth: any;
+let db: any;
+
+if (USE_FIREBASE) {
+    try {
+        if (!getApps().length) {
+            app = initializeApp(firebaseConfig);
+            console.log("Firebase initialized for project:", firebaseConfig.projectId);
+        } else {
+            app = getApp();
+        }
         
-        // Seed default settings
-        saveCollection('settings', [{
-            businessId: 'biz_default',
-            currency: 'USD',
-            currencySymbol: '$'
-        }]);
+        if (app) {
+            auth = getAuth(app);
+            db = getFirestore(app);
+        }
+    } catch (error) {
+        console.error("Firebase Init Error:", error);
     }
-};
-
-// Initialize seed data
-try {
-    if (typeof window !== 'undefined') {
-        seedData();
-    }
-} catch (e) {
-    console.warn("Storage not available");
 }
 
-const MockService = {
-  // --- AUTHENTICATION ---
+const handleFirebaseError = (error: any) => {
+    console.error("Detailed Firebase Error:", error);
+    const code = error.code || "";
+    const message = error.message || "";
+
+    if (code === 'auth/operation-not-allowed' || message.includes('configuration-not-found')) {
+        return "Setup Required: Please enable 'Email/Password' in your Firebase Console > Authentication > Sign-in method.";
+    }
+    if (code === 'permission-denied' || message.includes('Missing or insufficient permissions')) {
+        return "Setup Required: Please enable 'Cloud Firestore' in your Firebase Console and set Rules to 'Test Mode'.";
+    }
+    if (code === 'auth/network-request-failed' || message.includes('offline')) {
+        return "Connection Error: Check your internet or ensure the Firebase project ID is correct.";
+    }
+    if (code === 'auth/email-already-in-use') {
+        return "This email is already registered.";
+    }
+    if (code === 'auth/invalid-credential') {
+        return "Invalid login credentials. Please check your email and password.";
+    }
+    
+    return message || "A database error occurred. Ensure your Firebase project is correctly configured.";
+};
+
+// Helper: Create a user without logging out the current admin
+const createSecondaryUser = async (email: string, password: string) => {
+    let secondaryApp: FirebaseApp | null = null;
+    try {
+        const appName = `Secondary-${Date.now()}`;
+        secondaryApp = initializeApp(firebaseConfig, appName);
+        const secondaryAuth = getAuth(secondaryApp);
+        const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        await signOut(secondaryAuth);
+        return userCred.user;
+    } catch (e: any) {
+        throw new Error(handleFirebaseError(e));
+    } finally {
+        if (secondaryApp) {
+            try {
+                await deleteApp(secondaryApp);
+            } catch (e) {
+                console.warn("Could not cleanup secondary app:", e);
+            }
+        }
+    }
+};
+
+// ==========================================
+// FIREBASE SERVICE IMPLEMENTATION
+// ==========================================
+
+const FirebaseService = {
   login: async (email: string, password: string): Promise<User | null> => {
-      await delay(800);
-      const users = getCollection<User>('users');
-      // Case-insensitive email match
-      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      
-      if (user && user.isActive) {
-          // In mock mode, we accept any password for convenience, or specific ones
-          // For security in a real app, this would verify the hash
-          return user;
+      if (!auth) throw new Error("Firebase not initialized. Check your config.");
+      try {
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const uid = userCredential.user.uid;
+          
+          const userDoc = await getDoc(doc(db, 'users', uid));
+          if (userDoc.exists()) {
+              const userData = userDoc.data() as User;
+              return { ...userData, id: uid };
+          } else {
+              return { 
+                id: uid, 
+                username: email.split('@')[0], 
+                email, 
+                role: 'ADMIN', 
+                businessId: 'unknown', 
+                isActive: true, 
+                createdAt: Date.now() 
+              };
+          }
+      } catch (error: any) {
+          throw new Error(handleFirebaseError(error));
       }
-      return null;
   },
 
   signup: async (user: User): Promise<boolean> => {
-      await delay(800);
-      const users = getCollection<User>('users');
-      if (users.find(u => u.email === user.email)) return false;
-      
-      const newUser = { ...user, id: `user_${Date.now()}` };
-      users.push(newUser);
-      saveCollection('users', users);
-      
-      // Initialize Default Settings
-      const settings = getCollection<Settings>('settings');
-      settings.push({ businessId: newUser.businessId, currency: 'USD', currencySymbol: '$' });
-      saveCollection('settings', settings);
-
-      return true;
+      if (!auth) throw new Error("Firebase not initialized. Check your config.");
+      try {
+          const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password || 'password123');
+          const uid = userCredential.user.uid;
+          const { password, ...userData } = user;
+          const newUser = { ...userData, id: uid }; 
+          await setDoc(doc(db, 'users', uid), newUser);
+          await setDoc(doc(db, 'settings', newUser.businessId), { 
+              businessId: newUser.businessId, currency: 'USD', currencySymbol: '$' 
+          });
+          return true;
+      } catch (error: any) {
+          throw new Error(handleFirebaseError(error));
+      }
   },
 
-  // --- USERS ---
   getUsers: async (businessId: string): Promise<User[]> => {
-      await delay(500);
-      return getCollection<User>('users').filter(u => u.businessId === businessId);
+      try {
+          const q = query(collection(db, 'users'), where('businessId', '==', businessId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as User));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
   saveUser: async (user: User): Promise<void> => {
-      await delay(500);
-      const users = getCollection<User>('users');
-      const idx = users.findIndex(u => u.id === user.id);
-      
-      const userData = { ...user };
-      if (!userData.id) userData.id = `user_${Date.now()}`;
-
-      if (idx >= 0) {
-          users[idx] = { ...users[idx], ...userData };
-      } else {
-          users.push(userData);
+      try {
+          if (!user.id) {
+              const authUser = await createSecondaryUser(user.email, user.password || 'password123');
+              user.id = authUser.uid;
+          }
+          const { password, ...userData } = user;
+          await setDoc(doc(db, 'users', user.id), userData, { merge: true });
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
-      saveCollection('users', users);
   },
 
   deleteUser: async (id: string): Promise<void> => {
-      await delay(500);
-      const users = getCollection<User>('users').filter(u => u.id !== id);
-      saveCollection('users', users);
+      try {
+          await deleteDoc(doc(db, 'users', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- PRODUCTS ---
   getProducts: async (bid: string) => {
-      await delay(300);
-      return getCollection<Product>('products').filter(p => p.businessId === bid);
+      try {
+          const q = query(collection(db, 'products'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   saveProduct: async (p: Product) => {
-      await delay(300);
-      const list = getCollection<Product>('products');
-      if (p.id) {
-          const idx = list.findIndex(i => i.id === p.id);
-          if (idx >= 0) list[idx] = p;
-      } else {
-          list.push({ ...p, id: `prod_${Date.now()}` });
+      try {
+          if (p.id) await setDoc(doc(db, 'products', p.id), p, { merge: true });
+          else await addDoc(collection(db, 'products'), p);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
-      saveCollection('products', list);
   },
   deleteProduct: async (id: string) => {
-      await delay(300);
-      saveCollection('products', getCollection<Product>('products').filter(p => p.id !== id));
+      try {
+          await deleteDoc(doc(db, 'products', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   importProducts: async (products: Product[]) => {
-      await delay(1000);
-      const list = getCollection<Product>('products');
-      products.forEach(p => list.push({ ...p, id: `prod_${Math.random().toString(36).substr(2,9)}` }));
-      saveCollection('products', list);
+      try {
+          const batch = writeBatch(db);
+          products.forEach(p => {
+              const ref = doc(collection(db, 'products'));
+              batch.set(ref, { ...p, id: ref.id });
+          });
+          await batch.commit();
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- CATEGORIES ---
   getCategories: async (bid: string) => {
-      await delay(200);
-      return getCollection<Category>('categories').filter(c => c.businessId === bid);
+      try {
+          const q = query(collection(db, 'categories'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Category));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   saveCategory: async (c: Category) => {
-      await delay(200);
-      const list = getCollection<Category>('categories');
-      if (c.id) {
-          const idx = list.findIndex(i => i.id === c.id);
-          if (idx >= 0) list[idx] = c;
-      } else {
-          list.push({ ...c, id: `cat_${Date.now()}` });
+      try {
+          if (c.id) await setDoc(doc(db, 'categories', c.id), c, { merge: true });
+          else await addDoc(collection(db, 'categories'), c);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
-      saveCollection('categories', list);
   },
   deleteCategory: async (id: string) => {
-       await delay(200);
-       saveCollection('categories', getCollection<Category>('categories').filter(c => c.id !== id));
+      try {
+          await deleteDoc(doc(db, 'categories', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- STOCK LOGS ---
-  adjustStock: async (productId: string, qty: number, type: 'restock' | 'adjustment') => {
-      await delay(300);
-      const products = getCollection<Product>('products');
-      const pIdx = products.findIndex(p => p.id === productId);
-      
-      if (pIdx >= 0) {
-          const p = products[pIdx];
-          const newQty = (p.quantity || 0) + qty;
-          products[pIdx] = { ...p, quantity: newQty };
-          saveCollection('products', products);
+  getExpenseCategories: async (bid: string) => {
+      try {
+          const q = query(collection(db, 'expenseCategories'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as ExpenseCategory));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
+  },
+  saveExpenseCategory: async (c: ExpenseCategory) => {
+      try {
+          if (c.id) await setDoc(doc(db, 'expenseCategories', c.id), c, { merge: true });
+          else await addDoc(collection(db, 'expenseCategories'), c);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
+  },
+  deleteExpenseCategory: async (id: string) => {
+      try {
+          await deleteDoc(doc(db, 'expenseCategories', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
+  },
 
-          const logs = getCollection<StockLog>('stockLogs');
-          logs.push({
-              id: `log_${Date.now()}`,
-              businessId: p.businessId,
-              productId,
-              productName: p.name,
-              change: qty,
-              type,
-              date: Date.now(),
-              balance: newQty
-          });
-          saveCollection('stockLogs', logs);
+  adjustStock: async (productId: string, qty: number, type: 'restock' | 'adjustment') => {
+      try {
+          const pRef = doc(db, 'products', productId);
+          const pSnap = await getDoc(pRef);
+          if (pSnap.exists()) {
+              const p = pSnap.data() as Product;
+              const newQty = (p.quantity || 0) + qty;
+              await updateDoc(pRef, { quantity: newQty });
+              const log: StockLog = {
+                  id: '', businessId: p.businessId, productId, productName: p.name,
+                  change: qty, type, date: Date.now(), balance: newQty
+              };
+              await addDoc(collection(db, 'stockLogs'), log);
+          }
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
   },
   getStockLogs: async (bid: string) => {
-      await delay(300);
-      return getCollection<StockLog>('stockLogs').filter(l => l.businessId === bid).sort((a,b) => b.date - a.date);
+      try {
+          const q = query(collection(db, 'stockLogs'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          const logs = snap.docs.map(d => ({ ...d.data(), id: d.id } as StockLog));
+          return logs.sort((a, b) => b.date - a.date);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- SALES ---
   createPendingOrder: async (sale: Sale) => {
-      await delay(300);
-      const sales = getCollection<Sale>('sales');
-      sales.push({ ...sale, id: `sale_${Date.now()}`, status: 'Pending' });
-      saveCollection('sales', sales);
+      try {
+          await addDoc(collection(db, 'sales'), { ...sale, status: 'Pending' });
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   getPendingOrders: async (bid: string) => {
-      await delay(300);
-      return getCollection<Sale>('sales').filter(s => s.businessId === bid && s.status === 'Pending');
+      try {
+          const q = query(collection(db, 'sales'), where('businessId', '==', bid), where('status', '==', 'Pending'));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   completeOrder: async (saleId: string, paymentMethod: 'Cash'|'Card'|'Transfer') => {
-      await delay(500);
-      const sales = getCollection<Sale>('sales');
-      const sIdx = sales.findIndex(s => s.id === saleId);
-      
-      if (sIdx >= 0) {
-          const sale = sales[sIdx];
-          sale.status = 'Completed';
-          sale.paymentMethod = paymentMethod;
-          saveCollection('sales', sales);
-
-          // Update Stock
-          const products = getCollection<Product>('products');
-          const logs = getCollection<StockLog>('stockLogs');
-
-          sale.items.forEach(item => {
-              const pIdx = products.findIndex(p => p.id === item.productId);
-              if (pIdx >= 0) {
-                  const p = products[pIdx];
-                  const currentQty = p.quantity || 0;
-                  const newQty = currentQty - item.quantity;
-                  p.quantity = newQty;
-                  
-                  logs.push({
-                    id: `log_${Date.now()}_${Math.random()}`,
-                    businessId: sale.businessId,
-                    productId: item.productId,
-                    productName: item.productName,
-                    change: -item.quantity,
-                    type: 'sale',
-                    date: Date.now(),
-                    balance: newQty
-                  });
+      try {
+          const sRef = doc(db, 'sales', saleId);
+          const saleDoc = await getDoc(sRef);
+          if (saleDoc.exists()) {
+              const sale = saleDoc.data() as Sale;
+              const batch = writeBatch(db);
+              batch.update(sRef, { status: 'Completed', paymentMethod });
+              for (const item of sale.items) {
+                 const pRef = doc(db, 'products', item.productId);
+                 const pSnap = await getDoc(pRef);
+                 if(pSnap.exists()) {
+                     const currentQty = pSnap.data().quantity || 0;
+                     batch.update(pRef, { quantity: currentQty - item.quantity });
+                     const logRef = doc(collection(db, 'stockLogs'));
+                     batch.set(logRef, {
+                        businessId: sale.businessId, productId: item.productId, productName: item.productName,
+                        change: -item.quantity, type: 'sale', date: Date.now(), balance: currentQty - item.quantity
+                     });
+                 }
               }
-          });
-          saveCollection('products', products);
-          saveCollection('stockLogs', logs);
+              await batch.commit();
+          }
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
   },
   getSales: async (bid: string) => {
-      await delay(300);
-      return getCollection<Sale>('sales').filter(s => s.businessId === bid && s.status === 'Completed');
+      try {
+          const q = query(collection(db, 'sales'), where('businessId', '==', bid), where('status', '==', 'Completed'));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- PEOPLE (Customers/Employees/Suppliers) ---
   getCustomers: async (bid: string) => {
-      await delay(200);
-      return getCollection<Customer>('customers').filter(c => c.businessId === bid);
+      try {
+          const q = query(collection(db, 'customers'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   saveCustomer: async (c: Customer) => {
-      await delay(200);
-      const list = getCollection<Customer>('customers');
-      if (c.id) {
-          const idx = list.findIndex(i => i.id === c.id);
-          if (idx >= 0) list[idx] = c;
-      } else {
-          list.push({ ...c, id: `cust_${Date.now()}` });
+      try {
+          if (c.id) await setDoc(doc(db, 'customers', c.id), c, { merge: true });
+          else await addDoc(collection(db, 'customers'), c);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
-      saveCollection('customers', list);
   },
   deleteCustomer: async (id: string) => {
-      await delay(200);
-      saveCollection('customers', getCollection<Customer>('customers').filter(c => c.id !== id));
+      try {
+          await deleteDoc(doc(db, 'customers', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
   getEmployees: async (bid: string) => {
-      await delay(200);
-      return getCollection<Employee>('employees').filter(e => e.businessId === bid);
+      try {
+          const q = query(collection(db, 'employees'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Employee));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   saveEmployee: async (e: Employee) => {
-      await delay(200);
-      const list = getCollection<Employee>('employees');
-      if (e.id) {
-          const idx = list.findIndex(i => i.id === e.id);
-          if (idx >= 0) list[idx] = e;
-      } else {
-          list.push({ ...e, id: `emp_${Date.now()}` });
+      try {
+          if (e.id) await setDoc(doc(db, 'employees', e.id), e, { merge: true });
+          else await addDoc(collection(db, 'employees'), e);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
-      saveCollection('employees', list);
   },
   deleteEmployee: async (id: string) => {
-      await delay(200);
-      saveCollection('employees', getCollection<Employee>('employees').filter(e => e.id !== id));
+      try {
+          await deleteDoc(doc(db, 'employees', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
   getSuppliers: async (bid: string) => {
-      await delay(200);
-      return getCollection<Supplier>('suppliers').filter(s => s.businessId === bid);
+      try {
+          const q = query(collection(db, 'suppliers'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Supplier));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   saveSupplier: async (s: Supplier) => {
-      await delay(200);
-      const list = getCollection<Supplier>('suppliers');
-      if (s.id) {
-          const idx = list.findIndex(i => i.id === s.id);
-          if (idx >= 0) list[idx] = s;
-      } else {
-          list.push({ ...s, id: `sup_${Date.now()}` });
+      try {
+          if (s.id) await setDoc(doc(db, 'suppliers', s.id), s, { merge: true });
+          else await addDoc(collection(db, 'suppliers'), s);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
-      saveCollection('suppliers', list);
   },
   deleteSupplier: async (id: string) => {
-      await delay(200);
-      saveCollection('suppliers', getCollection<Supplier>('suppliers').filter(s => s.id !== id));
+      try {
+          await deleteDoc(doc(db, 'suppliers', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- EXPENSES ---
   getExpenses: async (bid: string) => {
-      await delay(200);
-      return getCollection<Expense>('expenses').filter(e => e.businessId === bid);
+      try {
+          const q = query(collection(db, 'expenses'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   addExpense: async (e: Expense) => {
-      await delay(200);
-      const list = getCollection<Expense>('expenses');
-      list.push({ ...e, id: `exp_${Date.now()}` });
-      saveCollection('expenses', list);
+      try {
+          if (e.id) await setDoc(doc(db, 'expenses', e.id), e, { merge: true });
+          else await addDoc(collection(db, 'expenses'), e);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   deleteExpense: async (id: string) => {
-      await delay(200);
-      saveCollection('expenses', getCollection<Expense>('expenses').filter(e => e.id !== id));
+      try {
+          await deleteDoc(doc(db, 'expenses', id));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- DASHBOARD STATS ---
   getDashboardStats: async (bid: string) => {
-      await delay(500);
-      const products = getCollection<Product>('products').filter(p => p.businessId === bid);
-      const customers = getCollection<Customer>('customers').filter(c => c.businessId === bid);
-      const sales = getCollection<Sale>('sales').filter(s => s.businessId === bid && s.status === 'Completed');
-      const expenses = getCollection<Expense>('expenses').filter(e => e.businessId === bid);
-
-      const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-      const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-      return {
-          productCount: products.length,
-          customerCount: customers.length,
-          saleCount: sales.length,
-          totalRevenue,
-          totalExpenses,
-          netProfit: totalRevenue - totalExpenses,
-          lowStockCount: products.filter(p => p.quantity < 10).length
-      };
+      try {
+          const products = await FirebaseService.getProducts(bid);
+          const customers = await FirebaseService.getCustomers(bid);
+          const sales = await FirebaseService.getSales(bid);
+          const expenses = await FirebaseService.getExpenses(bid);
+          const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
+          const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+          return {
+              productCount: products.length, customerCount: customers.length, saleCount: sales.length,
+              totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses,
+              lowStockCount: products.filter(p => p.quantity < 10).length
+          };
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- SETTINGS ---
   getSettings: async (bid: string): Promise<Settings> => {
-      await delay(100);
-      const settings = getCollection<Settings>('settings').find(s => s.businessId === bid);
-      return settings || { businessId: bid, currency: 'USD', currencySymbol: '$' };
+      try {
+          const docRef = doc(db, 'settings', bid);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) return snap.data() as Settings;
+          return { businessId: bid, currency: 'USD', currencySymbol: '$' };
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   saveSettings: async (s: Settings) => {
-      await delay(200);
-      const list = getCollection<Settings>('settings');
-      const idx = list.findIndex(item => item.businessId === s.businessId);
-      if (idx >= 0) list[idx] = s;
-      else list.push(s);
-      saveCollection('settings', list);
+      try {
+          await setDoc(doc(db, 'settings', s.businessId), s, { merge: true });
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
 
-  // --- NOTIFICATIONS ---
   getNotifications: async (bid: string) => {
-      await delay(100);
-      return getCollection<Notification>('notifications').filter(n => n.businessId === bid);
+      try {
+          const q = query(collection(db, 'notifications'), where('businessId', '==', bid));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Notification));
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   saveNotification: async (n: Notification) => {
-      const list = getCollection<Notification>('notifications');
-      list.push(n);
-      saveCollection('notifications', list);
+      try {
+          await setDoc(doc(db, 'notifications', n.id), n);
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
+      }
   },
   markNotificationRead: async (id: string) => {
-      const list = getCollection<Notification>('notifications');
-      const idx = list.findIndex(n => n.id === id);
-      if (idx >= 0) {
-          list[idx].read = true;
-          saveCollection('notifications', list);
+      try {
+          await updateDoc(doc(db, 'notifications', id), { read: true });
+      } catch (e) {
+          throw new Error(handleFirebaseError(e));
       }
   }
 };
 
-export const Api = MockService;
+const MockService = {
+  login: async () => null, signup: async () => false, getUsers: async () => [],
+  saveUser: async () => {}, deleteUser: async () => {}, getProducts: async () => [],
+  saveProduct: async () => {}, deleteProduct: async () => {}, importProducts: async () => {},
+  getCategories: async () => [], saveCategory: async () => {}, deleteCategory: async () => {},
+  getExpenseCategories: async () => [], saveExpenseCategory: async () => {}, deleteExpenseCategory: async () => {},
+  adjustStock: async () => {}, getStockLogs: async () => [], createPendingOrder: async () => {},
+  getPendingOrders: async () => [], completeOrder: async () => {}, getSales: async () => [],
+  getCustomers: async () => [], saveCustomer: async () => {}, deleteCustomer: async () => {},
+  getEmployees: async () => [], saveEmployee: async () => {}, deleteEmployee: async () => {},
+  getSuppliers: async () => [], saveSupplier: async () => {}, deleteSupplier: async () => {},
+  getExpenses: async () => [], addExpense: async () => {}, deleteExpense: async () => {},
+  getDashboardStats: async () => ({ productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0 }),
+  getSettings: async () => ({ businessId: '', currency: 'USD', currencySymbol: '$' }),
+  saveSettings: async () => {}, getNotifications: async () => [], saveNotification: async () => {},
+  markNotificationRead: async () => {}
+};
+
+export const Api = USE_FIREBASE ? FirebaseService : MockService;

@@ -35,11 +35,11 @@ export const Signup = () => {
 
     setIsLoading(true);
 
-    const success = await signup(formData.username, formData.email, formData.password);
-    if (success) {
+    const result = await signup(formData.username, formData.email, formData.password);
+    if (result.success) {
       navigate('/dashboard');
     } else {
-      setError('Registration failed. Email might already be in use.');
+      setError(result.error || 'Registration failed.');
       setIsLoading(false);
     }
   };
@@ -64,9 +64,9 @@ export const Signup = () => {
 
              <form onSubmit={handleSubmit} className="space-y-4">
                  {error && (
-                    <div className="bg-red-500/10 text-red-400 p-3 rounded-xl text-xs flex items-start gap-2 border border-red-500/20">
-                      <AlertCircle size={16} className="shrink-0 mt-0.5" /> 
-                      <span>{error}</span>
+                    <div className="bg-red-500/10 text-red-400 p-4 rounded-xl text-sm flex items-start gap-3 border border-red-500/20">
+                      <AlertCircle size={20} className="shrink-0 mt-0.5 text-red-500" /> 
+                      <span className="leading-relaxed">{error}</span>
                     </div>
                  )}
 
