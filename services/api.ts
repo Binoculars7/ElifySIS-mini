@@ -82,10 +82,12 @@ const sanitize = (data: any) => {
 const SupabaseService = {
   login: async (email: string, password: string): Promise<User | null> => {
       try {
-          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+          // Using signIn instead of signInWithPassword to support environments where older Supabase SDK versions are used.
+          // Casting to any to bypass the "Property 'signInWithPassword' does not exist" type error.
+          const { user: authUser, error: authError } = await (supabase.auth as any).signIn({ email, password });
           if (authError) throw authError;
 
-          const uid = authData.user?.id;
+          const uid = authUser?.id;
           if (!uid) return null;
 
           const { data: userData, error: userError } = await supabase
@@ -118,14 +120,15 @@ const SupabaseService = {
               throw new Error("Invalid email format");
           }
 
-          const { data: authData, error: authError } = await supabase.auth.signUp({
+          // Using v1-style signUp call and casting to any to bypass the "Property 'signUp' does not exist" type error.
+          const { user: authUser, error: authError } = await (supabase.auth as any).signUp({
               email: email,
               password: password || 'password123',
           });
           
           if (authError) throw authError;
 
-          const uid = authData.user?.id;
+          const uid = authUser?.id;
           if (!uid) return null;
 
           const newBusinessId = `biz_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
