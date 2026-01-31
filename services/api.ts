@@ -82,12 +82,14 @@ const sanitize = (data: any) => {
 const SupabaseService = {
   login: async (email: string, password: string): Promise<User | null> => {
       try {
-          // Using signIn instead of signInWithPassword to support environments where older Supabase SDK versions are used.
-          // Casting to any to bypass the "Property 'signInWithPassword' does not exist" type error.
-          const { user: authUser, error: authError } = await (supabase.auth as any).signIn({ email, password });
+          const { data, error: authError } = await supabase.auth.signInWithPassword({ 
+              email, 
+              password 
+          });
+          
           if (authError) throw authError;
 
-          const uid = authUser?.id;
+          const uid = data.user?.id;
           if (!uid) return null;
 
           const { data: userData, error: userError } = await supabase
@@ -98,6 +100,7 @@ const SupabaseService = {
 
           if (userError || !userData) {
               handleSupabaseError(userError, true);
+              // Fallback if user profile doesn't exist in custom table yet
               return { 
                 id: uid, 
                 username: email.split('@')[0], 
@@ -120,15 +123,14 @@ const SupabaseService = {
               throw new Error("Invalid email format");
           }
 
-          // Using v1-style signUp call and casting to any to bypass the "Property 'signUp' does not exist" type error.
-          const { user: authUser, error: authError } = await (supabase.auth as any).signUp({
+          const { data, error: authError } = await supabase.auth.signUp({
               email: email,
               password: password || 'password123',
           });
           
           if (authError) throw authError;
 
-          const uid = authUser?.id;
+          const uid = data.user?.id;
           if (!uid) return null;
 
           const newBusinessId = `biz_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -577,13 +579,11 @@ const SupabaseService = {
 
   getDashboardStats: async (bid: string) => {
       try {
-          // Wrap in individual try-catches so if one table isn't ready, the others still work
           const p = await SupabaseService.getProducts(bid).catch(() => []);
           const c = await SupabaseService.getCustomers(bid).catch(() => []);
           const s = await SupabaseService.getSales(bid).catch(() => []);
           const e = await SupabaseService.getExpenses(bid).catch(() => []);
 
-          // Added explicit type annotation for iteration to fix reduce-like ambiguity
           let totalRevenue = 0;
           s.forEach((sale: Sale) => {
               totalRevenue += (sale.totalAmount || 0);
@@ -678,7 +678,6 @@ const SupabaseService = {
 
 const MockService = {
   login: async () => null, 
-  // Unified MockService signup signature to match SupabaseService
   signup: async (username: string, email: string, password: string) => null, 
   getUsers: async () => [],
   saveUser: async () => {}, deleteUser: async () => {}, getProducts: async () => [],
