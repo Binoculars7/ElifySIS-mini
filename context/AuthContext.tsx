@@ -1,4 +1,3 @@
-
 /** @jsx React.createElement */
 /** @jsxFrag React.Fragment */
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -23,20 +22,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsed = JSON.parse(savedUser);
+        // Only restore if businessId is valid
+        if (parsed && parsed.businessId && parsed.businessId !== 'unknown') {
+            setUser(parsed);
+        } else {
+            localStorage.removeItem('currentUser');
+        }
+      } catch (e) {
+        localStorage.removeItem('currentUser');
+      }
     }
     setLoading(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<{success: boolean, error?: string}> => {
     try {
-      const user = await Api.login(email, password);
-      if (user) {
-        setUser(user);
-        localStorage.setItem('currentUser', JSON.stringify(user));
+      const loggedUser = await Api.login(email, password);
+      if (loggedUser) {
+        // Manually clone to ensure a plain serializable object
+        const cleanUser: User = {
+            id: loggedUser.id,
+            businessId: loggedUser.businessId,
+            username: loggedUser.username,
+            email: loggedUser.email,
+            role: loggedUser.role,
+            isActive: loggedUser.isActive,
+            createdAt: loggedUser.createdAt
+        };
+        setUser(cleanUser);
+        localStorage.setItem('currentUser', JSON.stringify(cleanUser));
         return { success: true };
       }
-      return { success: false, error: 'User not found.' };
+      return { success: false, error: 'User record not found.' };
     } catch (e: any) {
       return { success: false, error: e.message };
     }
@@ -44,23 +63,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (username: string, email: string, password: string): Promise<{success: boolean, error?: string}> => {
       try {
-          const newBusinessId = `biz_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-          
-          const newUser: User = {
-              id: '', // Will be set by Firebase Auth UID in API
-              businessId: newBusinessId,
-              username,
-              email,
-              password,
-              role: 'ADMIN',
-              isActive: true,
-              createdAt: Date.now()
-          };
-          const success = await Api.signup(newUser);
-          if (success) {
-              // Note: newUser.id is updated inside Api.signup
-              setUser(newUser);
-              localStorage.setItem('currentUser', JSON.stringify(newUser));
+          // Fix: Call Api.signup with individual arguments as expected by the SupabaseService implementation
+          const createdUser = await Api.signup(username, email, password);
+          if (createdUser) {
+              const cleanUser: User = {
+                  id: createdUser.id,
+                  businessId: createdUser.businessId,
+                  username: createdUser.username,
+                  email: createdUser.email,
+                  role: createdUser.role,
+                  isActive: createdUser.isActive,
+                  createdAt: createdUser.createdAt
+              };
+              setUser(cleanUser);
+              localStorage.setItem('currentUser', JSON.stringify(cleanUser));
               return { success: true };
           }
           return { success: false, error: 'Registration failed.' };

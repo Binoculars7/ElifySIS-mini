@@ -2,119 +2,100 @@
 import { 
   Product, Customer, Employee, Supplier, Sale, Expense, User, UserRole, StockLog, Category, ExpenseCategory, Settings, Notification
 } from '../types';
-import { initializeApp, getApp, getApps, FirebaseApp, deleteApp } from 'firebase/app';
-import { 
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut 
-} from 'firebase/auth';
-import { 
-  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, writeBatch, orderBy 
-} from 'firebase/firestore';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ==========================================
 // CONFIGURATION
 // ==========================================
 
-const USE_FIREBASE = true;
+const USE_SUPABASE = true;
 
-// IMPORTANT: Update this object with the config from your Firebase Console
-const firebaseConfig = {
-  apiKey: "AIzaSyBjIWvN9F8I8uzy8h_EPCxlNTDbwfPk-1g",
-  authDomain: "elifysis.firebaseapp.com",
-  projectId: "elifysis",
-  storageBucket: "elifysis.firebasestorage.app",
-  messagingSenderId: "526762118474",
-  appId: "1:526762118474:web:c55efccd11d584959005b3"
-};
+// Project Credentials
+const SUPABASE_URL = "https://ewjosphotbwvuqwklijm.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3am9zcGhvdGJ3dnVxd2tsaWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NzE1ODMsImV4cCI6MjA4NTM0NzU4M30.gA_bM7q9N3Ka1Kovafos4WdcBxT84vwnweNl08EEMO0";
 
 // ==========================================
-// FIREBASE INITIALIZATION
+// SUPABASE INITIALIZATION
 // ==========================================
 
-let app: FirebaseApp;
-let auth: any;
-let db: any;
+const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-if (USE_FIREBASE) {
-    try {
-        if (!getApps().length) {
-            app = initializeApp(firebaseConfig);
-            console.log("Firebase initialized for project:", firebaseConfig.projectId);
-        } else {
-            app = getApp();
-        }
-        
-        if (app) {
-            auth = getAuth(app);
-            db = getFirestore(app);
-        }
-    } catch (error) {
-        console.error("Firebase Init Error:", error);
-    }
-}
-
-const handleFirebaseError = (error: any) => {
-    console.error("Detailed Firebase Error:", error);
-    const code = error.code || "";
+const handleSupabaseError = (error: any, silent: boolean = false) => {
+    if (!error) return null;
+    
     const message = error.message || "";
+    const code = error.code || "";
+    
+    // Check if it's a genuine "Table Not Found" error
+    const isMissingTable = message.includes("Could not find the table") || 
+                           (message.includes("relation") && message.includes("does not exist")) ||
+                           message.includes("schema cache") ||
+                           code === '42P01';
 
-    if (code === 'auth/operation-not-allowed' || message.includes('configuration-not-found')) {
-        return "Setup Required: Please enable 'Email/Password' in your Firebase Console > Authentication > Sign-in method.";
+    if (isMissingTable) {
+        if (!silent) {
+            console.warn(`[Supabase Warning] Database table not initialized: ${message}. Visit Admin > Database Setup.`);
+        }
+        if (silent) return null; 
+        return "Database tables are not initialized. Please go to Admin > Database Setup to run the SQL schema.";
     }
-    if (code === 'permission-denied' || message.includes('Missing or insufficient permissions')) {
-        return "Setup Required: Please enable 'Cloud Firestore' in your Firebase Console and set Rules to 'Test Mode'.";
-    }
-    if (code === 'auth/network-request-failed' || message.includes('offline')) {
-        return "Connection Error: Check your internet or ensure the Firebase project ID is correct.";
-    }
-    if (code === 'auth/email-already-in-use') {
-        return "This email is already registered.";
-    }
-    if (code === 'auth/invalid-credential') {
-        return "Invalid login credentials. Please check your email and password.";
+
+    if (!silent && code !== 'PGRST116') {
+        console.error("Detailed Supabase Error:", error);
     }
     
-    return message || "A database error occurred. Ensure your Firebase project is correctly configured.";
-};
-
-// Helper: Create a user without logging out the current admin
-const createSecondaryUser = async (email: string, password: string) => {
-    let secondaryApp: FirebaseApp | null = null;
-    try {
-        const appName = `Secondary-${Date.now()}`;
-        secondaryApp = initializeApp(firebaseConfig, appName);
-        const secondaryAuth = getAuth(secondaryApp);
-        const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-        await signOut(secondaryAuth);
-        return userCred.user;
-    } catch (e: any) {
-        throw new Error(handleFirebaseError(e));
-    } finally {
-        if (secondaryApp) {
-            try {
-                await deleteApp(secondaryApp);
-            } catch (e) {
-                console.warn("Could not cleanup secondary app:", e);
-            }
-        }
+    if (message.includes("Invalid login credentials")) {
+        return "Invalid email or password. Please check your credentials and try again.";
     }
+    if (message.includes("Email address") && message.includes("invalid")) {
+        return "The email address provided is invalid. Please enter a valid email format.";
+    }
+    if (message.includes("Email not confirmed")) {
+        return "Your email has not been confirmed yet. Please check your inbox for a verification link.";
+    }
+    if (message.includes("User already registered")) {
+        return "An account with this email already exists. Try logging in instead.";
+    }
+
+    return message || "A database error occurred. Ensure your Supabase project is correctly configured.";
+};
+
+// Robust UUID validation
+const isUUID = (str: any): boolean => {
+  if (typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+};
+
+// Helper to remove invalid or empty IDs from payloads to avoid UUID syntax errors
+const sanitize = (data: any) => {
+    if (!data || typeof data !== 'object') return data;
+    const { id, ...rest } = data;
+    // If ID is blank or not a valid UUID string, we strip it so Supabase can generate a new one
+    if (!id || id === "" || !isUUID(id)) return rest;
+    return data;
 };
 
 // ==========================================
-// FIREBASE SERVICE IMPLEMENTATION
+// SUPABASE SERVICE IMPLEMENTATION
 // ==========================================
 
-const FirebaseService = {
+const SupabaseService = {
   login: async (email: string, password: string): Promise<User | null> => {
-      if (!auth) throw new Error("Firebase not initialized. Check your config.");
       try {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
-          const uid = userCredential.user.uid;
-          
-          const userDoc = await getDoc(doc(db, 'users', uid));
-          if (userDoc.exists()) {
-              const userData = userDoc.data() as User;
-              return { ...userData, id: uid };
-          } else {
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+          if (authError) throw authError;
+
+          const uid = authData.user?.id;
+          if (!uid) return null;
+
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', uid)
+            .single();
+
+          if (userError || !userData) {
+              handleSupabaseError(userError, true);
               return { 
                 id: uid, 
                 username: email.split('@')[0], 
@@ -125,391 +106,578 @@ const FirebaseService = {
                 createdAt: Date.now() 
               };
           }
+          return userData as User;
       } catch (error: any) {
-          throw new Error(handleFirebaseError(error));
+          throw new Error(handleSupabaseError(error));
       }
   },
 
-  signup: async (user: User): Promise<boolean> => {
-      if (!auth) throw new Error("Firebase not initialized. Check your config.");
+  signup: async (username: string, email: string, password: string): Promise<User | null> => {
       try {
-          const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password || 'password123');
-          const uid = userCredential.user.uid;
-          const { password, ...userData } = user;
-          const newUser = { ...userData, id: uid }; 
-          await setDoc(doc(db, 'users', uid), newUser);
-          await setDoc(doc(db, 'settings', newUser.businessId), { 
+          if (!email || !email.includes('@')) {
+              throw new Error("Invalid email format");
+          }
+
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+              email: email,
+              password: password || 'password123',
+          });
+          
+          if (authError) throw authError;
+
+          const uid = authData.user?.id;
+          if (!uid) return null;
+
+          const newBusinessId = `biz_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+          const newUser: User = { 
+            id: uid,
+            businessId: newBusinessId,
+            username,
+            email,
+            role: 'ADMIN',
+            isActive: true,
+            createdAt: Date.now()
+          }; 
+
+          const { error: insertError } = await supabase.from('users').upsert([newUser]);
+          if (insertError) {
+              handleSupabaseError(insertError, true);
+          }
+
+          const { error: settingsError } = await supabase.from('settings').upsert({ 
               businessId: newUser.businessId, currency: 'USD', currencySymbol: '$' 
           });
-          return true;
+          if (settingsError) {
+              handleSupabaseError(settingsError, true);
+          }
+
+          return newUser;
       } catch (error: any) {
-          throw new Error(handleFirebaseError(error));
+          throw new Error(handleSupabaseError(error));
       }
   },
 
   getUsers: async (businessId: string): Promise<User[]> => {
       try {
-          const q = query(collection(db, 'users'), where('businessId', '==', businessId));
-          const snapshot = await getDocs(q);
-          return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as User));
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('businessId', businessId);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as User[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
 
   saveUser: async (user: User): Promise<void> => {
       try {
-          if (!user.id) {
-              const authUser = await createSecondaryUser(user.email, user.password || 'password123');
-              user.id = authUser.uid;
-          }
           const { password, ...userData } = user;
-          await setDoc(doc(db, 'users', user.id), userData, { merge: true });
+          const { error } = await supabase.from('users').upsert(sanitize(userData));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   deleteUser: async (id: string): Promise<void> => {
       try {
-          await deleteDoc(doc(db, 'users', id));
+          const { error } = await supabase.from('users').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getProducts: async (bid: string) => {
       try {
-          const q = query(collection(db, 'products'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+          const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('businessId', bid);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Product[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+  
   saveProduct: async (p: Product) => {
       try {
-          if (p.id) await setDoc(doc(db, 'products', p.id), p, { merge: true });
-          else await addDoc(collection(db, 'products'), p);
+          const { error } = await supabase.from('products').upsert(sanitize(p));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   deleteProduct: async (id: string) => {
       try {
-          await deleteDoc(doc(db, 'products', id));
+          const { error } = await supabase.from('products').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   importProducts: async (products: Product[]) => {
       try {
-          const batch = writeBatch(db);
-          products.forEach(p => {
-              const ref = doc(collection(db, 'products'));
-              batch.set(ref, { ...p, id: ref.id });
-          });
-          await batch.commit();
+          const sanitizedProducts = products.map(p => sanitize(p));
+          const { error } = await supabase.from('products').insert(sanitizedProducts);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getCategories: async (bid: string) => {
       try {
-          const q = query(collection(db, 'categories'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Category));
+          const { data, error } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('businessId', bid);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Category[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   saveCategory: async (c: Category) => {
       try {
-          if (c.id) await setDoc(doc(db, 'categories', c.id), c, { merge: true });
-          else await addDoc(collection(db, 'categories'), c);
+          const { error } = await supabase.from('categories').upsert(sanitize(c));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   deleteCategory: async (id: string) => {
       try {
-          await deleteDoc(doc(db, 'categories', id));
+          const { error } = await supabase.from('categories').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getExpenseCategories: async (bid: string) => {
       try {
-          const q = query(collection(db, 'expenseCategories'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as ExpenseCategory));
+          const { data, error } = await supabase
+            .from('expenseCategories')
+            .select('*')
+            .eq('businessId', bid);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as ExpenseCategory[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   saveExpenseCategory: async (c: ExpenseCategory) => {
       try {
-          if (c.id) await setDoc(doc(db, 'expenseCategories', c.id), c, { merge: true });
-          else await addDoc(collection(db, 'expenseCategories'), c);
+          const { error } = await supabase.from('expenseCategories').upsert(sanitize(c));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   deleteExpenseCategory: async (id: string) => {
       try {
-          await deleteDoc(doc(db, 'expenseCategories', id));
+          const { error } = await supabase.from('expenseCategories').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   adjustStock: async (productId: string, qty: number, type: 'restock' | 'adjustment') => {
       try {
-          const pRef = doc(db, 'products', productId);
-          const pSnap = await getDoc(pRef);
-          if (pSnap.exists()) {
-              const p = pSnap.data() as Product;
-              const newQty = (p.quantity || 0) + qty;
-              await updateDoc(pRef, { quantity: newQty });
-              const log: StockLog = {
-                  id: '', businessId: p.businessId, productId, productName: p.name,
-                  change: qty, type, date: Date.now(), balance: newQty
-              };
-              await addDoc(collection(db, 'stockLogs'), log);
-          }
+          const { data: p, error: fetchError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .single();
+          
+          if (fetchError || !p) throw fetchError || new Error("Product not found");
+
+          const newQty = (p.quantity || 0) + qty;
+          const { error: updateError } = await supabase
+            .from('products')
+            .update({ quantity: newQty, lastUpdated: Date.now() })
+            .eq('id', productId);
+          
+          if (updateError) throw updateError;
+
+          const log = {
+              businessId: p.businessId, 
+              productId, 
+              productName: p.name,
+              change: qty, 
+              type, 
+              date: Date.now(), 
+              balance: newQty
+          };
+          await supabase.from('stockLogs').insert(sanitize(log));
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   getStockLogs: async (bid: string) => {
       try {
-          const q = query(collection(db, 'stockLogs'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          const logs = snap.docs.map(d => ({ ...d.data(), id: d.id } as StockLog));
-          return logs.sort((a, b) => b.date - a.date);
+          const { data, error } = await supabase
+            .from('stockLogs')
+            .select('*')
+            .eq('businessId', bid)
+            .order('date', { ascending: false });
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as StockLog[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
 
   createPendingOrder: async (sale: Sale) => {
       try {
-          await addDoc(collection(db, 'sales'), { ...sale, status: 'Pending' });
+          const { error } = await supabase.from('sales').insert(sanitize(sale));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   getPendingOrders: async (bid: string) => {
       try {
-          const q = query(collection(db, 'sales'), where('businessId', '==', bid), where('status', '==', 'Pending'));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+          const { data, error } = await supabase
+            .from('sales')
+            .select('*')
+            .eq('businessId', bid)
+            .eq('status', 'Pending');
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Sale[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   completeOrder: async (saleId: string, paymentMethod: 'Cash'|'Card'|'Transfer') => {
       try {
-          const sRef = doc(db, 'sales', saleId);
-          const saleDoc = await getDoc(sRef);
-          if (saleDoc.exists()) {
-              const sale = saleDoc.data() as Sale;
-              const batch = writeBatch(db);
-              batch.update(sRef, { status: 'Completed', paymentMethod });
-              for (const item of sale.items) {
-                 const pRef = doc(db, 'products', item.productId);
-                 const pSnap = await getDoc(pRef);
-                 if(pSnap.exists()) {
-                     const currentQty = pSnap.data().quantity || 0;
-                     batch.update(pRef, { quantity: currentQty - item.quantity });
-                     const logRef = doc(collection(db, 'stockLogs'));
-                     batch.set(logRef, {
-                        businessId: sale.businessId, productId: item.productId, productName: item.productName,
-                        change: -item.quantity, type: 'sale', date: Date.now(), balance: currentQty - item.quantity
-                     });
-                 }
-              }
-              await batch.commit();
+          const { data: sale, error: fetchError } = await supabase
+            .from('sales')
+            .select('*')
+            .eq('id', saleId)
+            .single();
+          
+          if (fetchError || !sale) throw fetchError || new Error("Sale not found");
+
+          const { error: updateSaleError } = await supabase
+            .from('sales')
+            .update({ status: 'Completed', paymentMethod })
+            .eq('id', saleId);
+          if (updateSaleError) throw updateSaleError;
+
+          for (const item of sale.items) {
+             const { data: p } = await supabase.from('products').select('*').eq('id', item.productId).single();
+             if (p) {
+                 const currentQty = p.quantity || 0;
+                 const newQty = currentQty - item.quantity;
+                 await supabase.from('products').update({ quantity: newQty, lastUpdated: Date.now() }).eq('id', item.productId);
+                 const log = {
+                    businessId: sale.businessId, 
+                    productId: item.productId, 
+                    productName: item.productName,
+                    change: -item.quantity, 
+                    type: 'sale', 
+                    date: Date.now(), 
+                    balance: newQty
+                 };
+                 await supabase.from('stockLogs').insert(sanitize(log));
+             }
           }
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   getSales: async (bid: string) => {
       try {
-          const q = query(collection(db, 'sales'), where('businessId', '==', bid), where('status', '==', 'Completed'));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+          const { data, error } = await supabase
+            .from('sales')
+            .select('*')
+            .eq('businessId', bid)
+            .eq('status', 'Completed');
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Sale[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
 
   getCustomers: async (bid: string) => {
       try {
-          const q = query(collection(db, 'customers'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+          const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('businessId', bid);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Customer[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   saveCustomer: async (c: Customer) => {
       try {
-          if (c.id) await setDoc(doc(db, 'customers', c.id), c, { merge: true });
-          else await addDoc(collection(db, 'customers'), c);
+          const { error } = await supabase.from('customers').upsert(sanitize(c));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   deleteCustomer: async (id: string) => {
       try {
-          await deleteDoc(doc(db, 'customers', id));
+          const { error } = await supabase.from('customers').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getEmployees: async (bid: string) => {
       try {
-          const q = query(collection(db, 'employees'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Employee));
+          const { data, error } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('businessId', bid);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Employee[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   saveEmployee: async (e: Employee) => {
       try {
-          if (e.id) await setDoc(doc(db, 'employees', e.id), e, { merge: true });
-          else await addDoc(collection(db, 'employees'), e);
+          const { error } = await supabase.from('employees').upsert(sanitize(e));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   deleteEmployee: async (id: string) => {
       try {
-          await deleteDoc(doc(db, 'employees', id));
+          const { error } = await supabase.from('employees').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getSuppliers: async (bid: string) => {
       try {
-          const q = query(collection(db, 'suppliers'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Supplier));
+          const { data, error } = await supabase
+            .from('suppliers')
+            .select('*')
+            .eq('businessId', bid);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Supplier[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   saveSupplier: async (s: Supplier) => {
       try {
-          if (s.id) await setDoc(doc(db, 'suppliers', s.id), s, { merge: true });
-          else await addDoc(collection(db, 'suppliers'), s);
+          const { error } = await supabase.from('suppliers').upsert(sanitize(s));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   deleteSupplier: async (id: string) => {
       try {
-          await deleteDoc(doc(db, 'suppliers', id));
+          const { error } = await supabase.from('suppliers').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getExpenses: async (bid: string) => {
       try {
-          const q = query(collection(db, 'expenses'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
+          const { data, error } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('businessId', bid);
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Expense[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   addExpense: async (e: Expense) => {
       try {
-          if (e.id) await setDoc(doc(db, 'expenses', e.id), e, { merge: true });
-          else await addDoc(collection(db, 'expenses'), e);
+          const { error } = await supabase.from('expenses').upsert(sanitize(e));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   deleteExpense: async (id: string) => {
       try {
-          await deleteDoc(doc(db, 'expenses', id));
+          const { error } = await supabase.from('expenses').delete().eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getDashboardStats: async (bid: string) => {
       try {
-          const products = await FirebaseService.getProducts(bid);
-          const customers = await FirebaseService.getCustomers(bid);
-          const sales = await FirebaseService.getSales(bid);
-          const expenses = await FirebaseService.getExpenses(bid);
-          const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-          const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+          // Wrap in individual try-catches so if one table isn't ready, the others still work
+          const p = await SupabaseService.getProducts(bid).catch(() => []);
+          const c = await SupabaseService.getCustomers(bid).catch(() => []);
+          const s = await SupabaseService.getSales(bid).catch(() => []);
+          const e = await SupabaseService.getExpenses(bid).catch(() => []);
+
+          // Added explicit type annotation for iteration to fix reduce-like ambiguity
+          let totalRevenue = 0;
+          s.forEach((sale: Sale) => {
+              totalRevenue += (sale.totalAmount || 0);
+          });
+
+          let totalExpenses = 0;
+          e.forEach((exp: Expense) => {
+              totalExpenses += (exp.amount || 0);
+          });
+          
           return {
-              productCount: products.length, customerCount: customers.length, saleCount: sales.length,
+              productCount: p.length, customerCount: c.length, saleCount: s.length,
               totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses,
-              lowStockCount: products.filter(p => p.quantity < 10).length
+              lowStockCount: p.filter(prod => prod.quantity < 10).length
           };
-      } catch (e) {
-          throw new Error(handleFirebaseError(e));
+      } catch (err) {
+          return { productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0 };
       }
   },
 
   getSettings: async (bid: string): Promise<Settings> => {
       try {
-          const docRef = doc(db, 'settings', bid);
-          const snap = await getDoc(docRef);
-          if (snap.exists()) return snap.data() as Settings;
+          const { data, error } = await supabase
+            .from('settings')
+            .select('*')
+            .eq('businessId', bid)
+            .maybeSingle();
+
+          if (error) {
+              const handled = handleSupabaseError(error, false);
+              if (handled && handled.includes("initialized")) {
+                  throw new Error(handled);
+              }
+              return { businessId: bid, currency: 'USD', currencySymbol: '$' };
+          }
+          
+          if (!data) {
+              return { businessId: bid, currency: 'USD', currencySymbol: '$' };
+          }
+          
+          return data as Settings;
+      } catch (e: any) {
+          if (e.message && e.message.includes("initialized")) throw e;
           return { businessId: bid, currency: 'USD', currencySymbol: '$' };
-      } catch (e) {
-          throw new Error(handleFirebaseError(e));
       }
   },
+
   saveSettings: async (s: Settings) => {
       try {
-          await setDoc(doc(db, 'settings', s.businessId), s, { merge: true });
+          const { error } = await supabase.from('settings').upsert(sanitize(s));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
 
   getNotifications: async (bid: string) => {
       try {
-          const q = query(collection(db, 'notifications'), where('businessId', '==', bid));
-          const snap = await getDocs(q);
-          return snap.docs.map(d => ({ ...d.data(), id: d.id } as Notification));
+          const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('businessId', bid)
+            .order('timestamp', { ascending: false });
+          if (error) {
+              handleSupabaseError(error, true);
+              return [];
+          }
+          return (data as Notification[]) || [];
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          return [];
       }
   },
+
   saveNotification: async (n: Notification) => {
       try {
-          await setDoc(doc(db, 'notifications', n.id), n);
+          const { error } = await supabase.from('notifications').upsert(sanitize(n));
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   },
+
   markNotificationRead: async (id: string) => {
       try {
-          await updateDoc(doc(db, 'notifications', id), { read: true });
+          const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+          if (error) throw error;
       } catch (e) {
-          throw new Error(handleFirebaseError(e));
+          throw new Error(handleSupabaseError(e));
       }
   }
 };
 
 const MockService = {
-  login: async () => null, signup: async () => false, getUsers: async () => [],
+  login: async () => null, 
+  // Unified MockService signup signature to match SupabaseService
+  signup: async (username: string, email: string, password: string) => null, 
+  getUsers: async () => [],
   saveUser: async () => {}, deleteUser: async () => {}, getProducts: async () => [],
   saveProduct: async () => {}, deleteProduct: async () => {}, importProducts: async () => {},
   getCategories: async () => [], saveCategory: async () => {}, deleteCategory: async () => {},
@@ -526,4 +694,4 @@ const MockService = {
   markNotificationRead: async () => {}
 };
 
-export const Api = USE_FIREBASE ? FirebaseService : MockService;
+export const Api = USE_SUPABASE ? SupabaseService : MockService;

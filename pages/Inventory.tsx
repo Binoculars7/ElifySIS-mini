@@ -1,5 +1,3 @@
-
-
 /** @jsx React.createElement */
 /** @jsxFrag React.Fragment */
 import React, { useState, useEffect, useRef } from 'react';
@@ -34,12 +32,18 @@ export const Inventory = () => {
 
   const loadData = async () => {
     if (!user) return;
-    const p = await Api.getProducts(user.businessId);
-    const s = await Api.getSuppliers(user.businessId);
-    const c = await Api.getCategories(user.businessId);
-    setProducts(p);
-    setSuppliers(s);
-    setCategories(c);
+    try {
+        const [p, s, c] = await Promise.all([
+            Api.getProducts(user.businessId),
+            Api.getSuppliers(user.businessId),
+            Api.getCategories(user.businessId)
+        ]);
+        setProducts(p);
+        setSuppliers(s);
+        setCategories(c);
+    } catch (err) {
+        console.error("Inventory data fetch failed:", err);
+    }
   };
 
   useEffect(() => { loadData(); }, [user]);
@@ -48,36 +52,49 @@ export const Inventory = () => {
     if (!user) return;
     const commonData = { businessId: user.businessId };
 
-    if (activeTab === 'products') {
-        if (!formData.name || !formData.buyPrice) return;
-        await Api.saveProduct({ ...formData, ...commonData } as Product);
-    } else if (activeTab === 'suppliers') {
-        if (!formData.name) return;
-        await Api.saveSupplier({ ...formData, ...commonData } as Supplier);
-    } else if (activeTab === 'categories') {
-        if (!formData.name) return;
-        await Api.saveCategory({ ...formData, ...commonData } as Category);
+    try {
+        if (activeTab === 'products') {
+            if (!formData.name) return;
+            await Api.saveProduct({ 
+              ...formData, 
+              ...commonData,
+              lastUpdated: Date.now() 
+            } as Product);
+        } else if (activeTab === 'suppliers') {
+            if (!formData.name) return;
+            await Api.saveSupplier({ 
+              ...formData, 
+              ...commonData,
+              createdAt: formData.createdAt || Date.now()
+            } as Supplier);
+        } else if (activeTab === 'categories') {
+            if (!formData.name) return;
+            await Api.saveCategory({ ...formData, ...commonData } as Category);
+        }
+        
+        setIsModalOpen(false);
+        loadData();
+        setFormData({});
+    } catch (err: any) {
+        alert("Save failed: " + err.message);
     }
-    
-    setIsModalOpen(false);
-    loadData();
-    setFormData({});
   };
 
   const confirmDelete = async () => {
       const { id, type } = deleteModal;
-      if (type === 'category') {
-          setCategories(prev => prev.filter(c => c.id !== id));
-          await Api.deleteCategory(id);
-      } else if (type === 'supplier') {
-          setSuppliers(prev => prev.filter(s => s.id !== id));
-          await Api.deleteSupplier(id);
-      } else if (type === 'product') {
-          setProducts(prev => prev.filter(p => p.id !== id));
-          await Api.deleteProduct(id);
+      try {
+          if (type === 'category') {
+              await Api.deleteCategory(id);
+          } else if (type === 'supplier') {
+              await Api.deleteSupplier(id);
+          } else if (type === 'product') {
+              await Api.deleteProduct(id);
+          }
+          loadData();
+          setDeleteModal({ isOpen: false, id: '', type: 'product' });
+      } catch (err: any) {
+          alert("Delete failed: " + err.message);
       }
-      loadData();
-      setDeleteModal({ isOpen: false, id: '', type: 'product' });
   };
 
   const openDeleteModal = (id: string, type: 'product' | 'supplier' | 'category') => {
@@ -94,20 +111,23 @@ export const Inventory = () => {
       if (isNaN(qty) || qty === 0) return;
       
       const type = 'adjustment';
-      await Api.adjustStock(adjustModal.productId, qty, type);
-      
-      setAdjustModal({ ...adjustModal, isOpen: false });
-      loadData();
+      try {
+          await Api.adjustStock(adjustModal.productId, qty, type);
+          setAdjustModal({ ...adjustModal, isOpen: false });
+          loadData();
+      } catch (err: any) {
+          alert("Adjustment failed: " + err.message);
+      }
   };
 
   const downloadTemplate = () => {
       const headers = "Name,Description,Quantity,BuyPrice,SellPrice,Category,SupplierId";
-      const example = "Sample Product,A great item,100,5.00,10.00,General,s1";
+      const example = "Sample Product,A great item,100,5.00,10.00,General,";
       const blob = new Blob([headers + "\n" + example], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = "product_import_template.csv";
+      a.download = "inventory_import_template.csv";
       a.click();
   };
 
@@ -126,12 +146,10 @@ export const Inventory = () => {
               return;
           }
 
-          // Simple CSV parser
           const newProducts: Product[] = [];
-          
           for (let i = 1; i < rows.length; i++) {
               const cols = rows[i].split(',');
-              if (cols.length < 5) continue; // Basic validation
+              if (cols.length < 5) continue;
 
               const p: any = {
                   businessId: user.businessId,
@@ -145,16 +163,18 @@ export const Inventory = () => {
                   lastUpdated: Date.now()
               };
               
-              if (p.name && p.sellPrice >= 0) {
-                  newProducts.push(p);
-              }
+              if (p.name) newProducts.push(p);
           }
 
           if (newProducts.length > 0) {
               if (window.confirm(`Found ${newProducts.length} valid products. Import them?`)) {
-                  await Api.importProducts(newProducts);
-                  alert("Import successful!");
-                  loadData();
+                  try {
+                      await Api.importProducts(newProducts);
+                      alert("Import successful!");
+                      loadData();
+                  } catch (err: any) {
+                      alert("Import failed: " + err.message);
+                  }
               }
           } else {
               alert("No valid products found in CSV.");
@@ -172,10 +192,10 @@ export const Inventory = () => {
   });
 
   const productColumns = [
-    { header: 'Product Name', accessor: 'name' as keyof Product, className: 'font-medium' },
+    { header: 'Product Name', accessor: 'name' as keyof Product, className: 'font-bold' },
     { header: 'Category', accessor: 'category' as keyof Product },
     { header: 'Stock', accessor: (p: Product) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.quantity < 10 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+        <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider ${p.quantity < 10 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
             {p.quantity} Units
         </span>
     ) },
@@ -184,228 +204,147 @@ export const Inventory = () => {
   ];
 
   const supplierColumns = [
-    { header: 'Name', accessor: 'name' as keyof Supplier },
+    { header: 'Supplier Name', accessor: 'name' as keyof Supplier, className: 'font-bold' },
     { header: 'Phone', accessor: 'phone' as keyof Supplier },
     { header: 'Address', accessor: 'address' as keyof Supplier },
   ];
 
   const categoryColumns = [
       { header: 'Category Name', accessor: 'name' as keyof Category, className: 'font-bold' },
-      { header: 'ID', accessor: 'id' as keyof Category, className: 'text-gray-400 text-xs' }
+      { header: 'ID', accessor: 'id' as keyof Category, className: 'text-gray-400 font-mono text-xs' }
   ];
-
-  const getModalTitle = () => {
-      if(activeTab === 'products') return "Add New Product";
-      if(activeTab === 'suppliers') return "Add New Supplier";
-      return "Add New Category";
-  };
-
-  const getDeleteMessage = () => {
-      if(deleteModal.type === 'category') return "Are you sure you want to delete this category?";
-      if(deleteModal.type === 'supplier') return "Are you sure you want to delete this supplier?";
-      return "Are you sure you want to delete this product? This action cannot be undone.";
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex gap-4 border-b border-gray-200 pb-2">
         <button 
           onClick={() => setActiveTab('products')} 
-          className={`pb-2 px-4 font-medium ${activeTab === 'products' ? 'text-primary border-b-2 border-primary' : 'text-textSecondary'}`}
+          className={`pb-2 px-4 font-bold text-sm transition-all ${activeTab === 'products' ? 'text-primary border-b-2 border-primary' : 'text-textSecondary hover:text-textPrimary'}`}
         >
-          Products
+          Inventory Items
         </button>
         <button 
           onClick={() => setActiveTab('suppliers')} 
-          className={`pb-2 px-4 font-medium ${activeTab === 'suppliers' ? 'text-primary border-b-2 border-primary' : 'text-textSecondary'}`}
+          className={`pb-2 px-4 font-bold text-sm transition-all ${activeTab === 'suppliers' ? 'text-primary border-b-2 border-primary' : 'text-textSecondary hover:text-textPrimary'}`}
         >
           Suppliers
         </button>
         <button 
           onClick={() => setActiveTab('categories')} 
-          className={`pb-2 px-4 font-medium ${activeTab === 'categories' ? 'text-primary border-b-2 border-primary' : 'text-textSecondary'}`}
+          className={`pb-2 px-4 font-bold text-sm transition-all ${activeTab === 'categories' ? 'text-primary border-b-2 border-primary' : 'text-textSecondary hover:text-textPrimary'}`}
         >
           Categories
         </button>
       </div>
 
       <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
-         <div>
+         <div className="flex flex-wrap gap-2 items-center">
             {activeTab === 'products' && (
-                <div className="flex flex-wrap gap-2 items-center">
-                    <input 
-                        type="file" 
-                        accept=".csv" 
-                        ref={fileInputRef} 
-                        className="hidden" 
-                        onChange={handleFileUpload} 
-                    />
-                    <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
-                        <Upload size={16}/> Import CSV
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={downloadTemplate} className="gap-2 text-primary">
-                        <FileDown size={16}/> Template
-                    </Button>
-
+                <>
+                    <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                    <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2"><Upload size={16}/> Import</Button>
+                    <Button variant="ghost" size="sm" onClick={downloadTemplate} className="gap-2 text-primary"><FileDown size={16}/> Template</Button>
                     <div className="h-6 w-px bg-gray-300 mx-2 hidden lg:block"></div>
-                    
-                    <div className="flex gap-2">
-                        <select 
-                            className="bg-slate-700 text-white border border-slate-600 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-primary"
-                            value={filterCategory}
-                            onChange={e => setFilterCategory(e.target.value)}
-                        >
-                            <option value="">All Categories</option>
-                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                        </select>
-
-                        <select 
-                            className="bg-slate-700 text-white border border-slate-600 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-primary"
-                            value={filterSupplier}
-                            onChange={e => setFilterSupplier(e.target.value)}
-                        >
-                            <option value="">All Suppliers</option>
-                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                    </div>
-                </div>
+                    <select className="bg-slate-700 text-white border border-slate-600 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider outline-none focus:border-primary" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+                        <option value="">All Categories</option>
+                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                    <select className="bg-slate-700 text-white border border-slate-600 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider outline-none focus:border-primary" value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}>
+                        <option value="">All Suppliers</option>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                </>
             )}
          </div>
          <Button onClick={() => { setFormData({}); setIsModalOpen(true); }} className="gap-2">
-            <Plus size={18} /> Add {activeTab === 'categories' ? 'Category' : activeTab === 'suppliers' ? 'Supplier' : 'Product'}
+            <Plus size={18} /> New {activeTab === 'categories' ? 'Category' : activeTab === 'suppliers' ? 'Supplier' : 'Product'}
          </Button>
       </div>
 
       {activeTab === 'products' && (
         <DataTable 
-          title="Product Inventory" 
+          title="Stock Ledger" 
           data={filteredProducts} 
           columns={productColumns} 
           actions={(item) => (
              <div className="flex justify-end gap-2">
-                 <button className="text-gray-500 hover:text-primary" onClick={() => openAdjustStock(item)} title="Adjust Stock">
-                    <Activity size={16} />
-                 </button>
-                 <button className="text-blue-600 hover:text-blue-800" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
-                 <button className="text-red-500 hover:text-red-700" onClick={() => openDeleteModal(item.id, 'product')}><Trash2 size={16}/></button>
+                 <button className="text-slate-400 hover:text-primary p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => openAdjustStock(item)} title="Quick Adjust Stock"><Activity size={16} /></button>
+                 <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
+                 <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'product')}><Trash2 size={16}/></button>
              </div>
           )}
         />
       )}
 
       {activeTab === 'suppliers' && (
-        <DataTable 
-          title="Supplier List" 
-          data={suppliers} 
-          columns={supplierColumns}
+        <DataTable title="Authorized Suppliers" data={suppliers} columns={supplierColumns}
           actions={(item) => (
              <div className="flex justify-end gap-2">
-                 <button className="text-blue-600 hover:text-blue-800" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
-                 <button className="text-red-500 hover:text-red-700" onClick={() => openDeleteModal(item.id, 'supplier')}><Trash2 size={16}/></button>
+                 <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
+                 <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'supplier')}><Trash2 size={16}/></button>
              </div>
           )} 
         />
       )}
 
       {activeTab === 'categories' && (
-          <DataTable 
-            title="Product Categories"
-            data={categories}
-            columns={categoryColumns}
+          <DataTable title="Item Groupings" data={categories} columns={categoryColumns}
             actions={(item) => (
                 <div className="flex justify-end gap-2">
-                    <button className="text-blue-600 hover:text-blue-800" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
-                    <button className="text-red-500 hover:text-red-700" onClick={() => openDeleteModal(item.id, 'category')}><Trash2 size={16}/></button>
+                    <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
+                    <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'category')}><Trash2 size={16}/></button>
                 </div>
             )}
           />
       )}
 
-      {/* Confirmation Modal */}
-      <ConfirmationModal 
-        isOpen={deleteModal.isOpen} 
-        onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })} 
-        onConfirm={confirmDelete}
-        title="Confirm Deletion"
-        message={getDeleteMessage()}
-      />
+      <ConfirmationModal isOpen={deleteModal.isOpen} onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })} onConfirm={confirmDelete} title="Confirm Deletion" message="This action is irreversible. All associated records may be affected." />
 
-      {/* Adjust Stock Modal */}
-      <Modal 
-         isOpen={adjustModal.isOpen} 
-         onClose={() => setAdjustModal({...adjustModal, isOpen: false})} 
-         title="Manual Stock Adjustment"
-      >
+      <Modal isOpen={adjustModal.isOpen} onClose={() => setAdjustModal({...adjustModal, isOpen: false})} title="Audit Stock Adjustment">
          <div className="space-y-4">
-             <div className="p-4 bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm">
-                 <p className="font-bold">Product: {adjustModal.productName}</p>
-                 <p>Current Stock: {adjustModal.currentQty}</p>
+             <div className="p-4 bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm border border-blue-100">
+                 <p className="font-black uppercase tracking-widest text-[10px] mb-1">Target Product</p>
+                 <p className="font-bold text-lg leading-tight mb-2">{adjustModal.productName}</p>
+                 <div className="flex justify-between items-center text-xs opacity-80">
+                    <span>Current Inventory:</span>
+                    <span className="font-black">{adjustModal.currentQty} Units</span>
+                 </div>
              </div>
-             
-             <Input 
-                label="Adjustment Quantity (+/-)" 
-                type="number" 
-                value={adjustQty} 
-                onChange={e => setAdjustQty(e.target.value)} 
-                placeholder="e.g., 5 to add, -3 to remove"
-             />
-             <p className="text-xs text-gray-500">
-                Enter a positive number to add stock (restock/return).<br/>
-                Enter a negative number to deduct stock (damage/loss).
-             </p>
-
-             <div className="flex justify-end gap-3 mt-6">
-                <Button variant="secondary" onClick={() => setAdjustModal({...adjustModal, isOpen: false})}>Cancel</Button>
-                <Button onClick={handleStockAdjustment}>Update Stock</Button>
+             <Input label="Adjustment Value (+ or -)" type="number" value={adjustQty} onChange={e => setAdjustQty(e.target.value)} placeholder="e.g. 10 to restock, -2 for damage" />
+             <div className="flex justify-end gap-3 mt-8">
+                <Button variant="secondary" onClick={() => setAdjustModal({...adjustModal, isOpen: false})}>Discard</Button>
+                <Button onClick={handleStockAdjustment}>Apply Audit</Button>
              </div>
          </div>
       </Modal>
 
-      {/* Edit/Add Modal */}
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        title={getModalTitle()}
-      >
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? 'Edit Record' : 'Create New Record'}>
         <div className="space-y-4">
           {activeTab === 'products' ? (
             <>
-               <Input label="Name" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+               <Input label="Product Full Name" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
                <div className="grid grid-cols-2 gap-4">
-                  <Input type="number" label="Buy Price" value={formData.buyPrice || ''} onChange={e => setFormData({...formData, buyPrice: parseFloat(e.target.value)})} />
-                  <Input type="number" label="Sell Price" value={formData.sellPrice || ''} onChange={e => setFormData({...formData, sellPrice: parseFloat(e.target.value)})} />
+                  <Input type="number" label="Buy Unit Price" value={formData.buyPrice || ''} onChange={e => setFormData({...formData, buyPrice: parseFloat(e.target.value)})} />
+                  <Input type="number" label="Sell Unit Price" value={formData.sellPrice || ''} onChange={e => setFormData({...formData, sellPrice: parseFloat(e.target.value)})} />
                </div>
                <div className="grid grid-cols-2 gap-4">
-                  <Input type="number" label="Quantity" value={formData.quantity || ''} onChange={e => setFormData({...formData, quantity: parseInt(e.target.value)})} />
-                  <Select 
-                    label="Category" 
-                    value={formData.category || ''} 
-                    options={[{value: '', label: 'Select Category'}, ...categories.map(c => ({ value: c.name, label: c.name }))]}
-                    onChange={e => setFormData({...formData, category: e.target.value})} 
-                  />
+                  <Input type="number" label="Opening Quantity" value={formData.quantity || ''} onChange={e => setFormData({...formData, quantity: parseInt(e.target.value)})} />
+                  <Select label="Category" value={formData.category || ''} options={[{value: '', label: 'None'}, ...categories.map(c => ({ value: c.name, label: c.name }))]} onChange={e => setFormData({...formData, category: e.target.value})} />
                </div>
-               <Select 
-                 label="Supplier"
-                 options={[{value: '', label: 'Select Supplier'}, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
-                 value={formData.supplierId}
-                 onChange={e => setFormData({...formData, supplierId: e.target.value})}
-               />
+               <Select label="Authorized Supplier" options={[{value: '', label: 'None'}, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={formData.supplierId} onChange={e => setFormData({...formData, supplierId: e.target.value})} />
             </>
           ) : activeTab === 'suppliers' ? (
              <>
-                <Input label="Supplier Name" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
-                <Input label="Phone Number" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                <Input label="Address" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
+                <Input label="Authorized Name" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                <Input label="Contact Phone" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                <Input label="Physical Address" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
              </>
           ) : (
-             <>
-                <Input label="Category Name" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
-             </>
+             <Input label="Category Label" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
           )}
-          
-          <div className="flex justify-end gap-3 mt-6">
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave}>Save Entry</Button>
+          <div className="flex justify-end gap-3 mt-8">
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Discard</Button>
+            <Button onClick={handleSave}>Confirm Save</Button>
           </div>
         </div>
       </Modal>

@@ -16,6 +16,19 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType>(null!);
 
+// RFC4122 v4 Compliant UUID Generator
+const generateUUID = () => {
+  if (typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts or older browsers
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -32,7 +45,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [user]);
 
   const notify = useCallback(async (message: string, type: NotificationType = 'info', title: string = 'System Notification') => {
-    const id = Math.random().toString(36).substr(2, 9);
+    // Generate a valid UUID to prevent "invalid input syntax for type uuid" database errors
+    const id = generateUUID();
+    
     const newNotif: Notification = {
         id,
         businessId: user?.businessId || '',
@@ -43,7 +58,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         timestamp: Date.now()
     };
 
-    // Add to toasts (transient)
+    // Add to toasts (transient UI element)
     setToasts(prev => [...prev, newNotif]);
     setTimeout(() => {
         setToasts(prev => prev.filter(n => n.id !== id));

@@ -7,24 +7,54 @@ import { Settings } from '../types';
 
 interface SettingsContextType {
   settings: Settings;
+  dbReady: boolean;
   updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
   formatCurrency: (amount: number) => string;
+  checkDbStatus: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType>(null!);
 
+// Mapping currencies to their specific locales to force correct symbol rendering
+const CURRENCY_LOCALE_MAP: Record<string, string> = {
+  'NGN': 'en-NG',
+  'USD': 'en-US',
+  'EUR': 'fr-FR',
+  'GBP': 'en-GB',
+  'KES': 'en-KE',
+  'GHS': 'en-GH',
+  'INR': 'en-IN',
+  'ZAR': 'en-ZA',
+  'CAD': 'en-CA',
+  'AUD': 'en-AU',
+};
+
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const [dbReady, setDbReady] = useState(true);
   const [settings, setSettings] = useState<Settings>({ 
       businessId: '', 
       currency: 'USD', 
       currencySymbol: '$' 
   });
 
-  useEffect(() => {
-    if (user) {
-        Api.getSettings(user.businessId).then(setSettings);
+  const checkDbStatus = async () => {
+    if (!user) return;
+    try {
+        const data = await Api.getSettings(user.businessId);
+        setSettings(data);
+        setDbReady(true);
+    } catch (e: any) {
+        if (e.message && (e.message.includes("initialized") || e.message.includes("table"))) {
+            setDbReady(false);
+        } else {
+            setDbReady(true);
+        }
     }
+  };
+
+  useEffect(() => {
+    checkDbStatus();
   }, [user]);
 
   const updateSettings = async (newSettings: Partial<Settings>) => {
@@ -36,17 +66,21 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const formatCurrency = (amount: number) => {
       try {
-        return new Intl.NumberFormat('en-US', {
+        const locale = CURRENCY_LOCALE_MAP[settings.currency] || 'en-US';
+        return new Intl.NumberFormat(locale, {
             style: 'currency',
             currency: settings.currency,
+            currencyDisplay: 'symbol' // Ensures ₦ instead of NGN
         }).format(amount);
       } catch (e) {
-        return `${settings.currency} ${amount.toFixed(2)}`;
+        // Fallback if Intl fails
+        const symbol = settings.currencySymbol || settings.currency;
+        return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, formatCurrency }}>
+    <SettingsContext.Provider value={{ settings, dbReady, updateSettings, formatCurrency, checkDbStatus }}>
       {children}
     </SettingsContext.Provider>
   );

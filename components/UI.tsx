@@ -170,9 +170,14 @@ export const DataTable = <T extends { id: string }>({ data, columns, actions, ti
   }, [data.length]);
 
   const filteredData = data.filter((item) =>
-    Object.values(item as any).some((val) =>
-      String(val).toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    Object.values(item as any).some((val) => {
+      // Robust null check
+      if (val === null || val === undefined) return false;
+      // If it's an object (like items array in Sale), we skip it for search to prevent crashes
+      if (typeof val === 'object') return false; 
+      // Safe string conversion for numbers and booleans
+      return String(val).toLowerCase().includes(searchTerm.toLowerCase());
+    })
   );
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
