@@ -1,3 +1,4 @@
+
 /** @jsx React.createElement */
 /** @jsxFrag React.Fragment */
 import React, { useState, useEffect, useMemo } from 'react';
@@ -223,33 +224,31 @@ export const Finance = () => {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Revenue vs Periodic Spend</p>
                 </div>
                 
-                <div className="flex-1 w-full min-h-0 flex flex-col items-center">
-                    <div className="w-full h-48 md:h-52 mb-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                              <Pie 
-                                  data={chartData} 
-                                  cx="50%" 
-                                  cy="50%" 
-                                  innerRadius={50} 
-                                  outerRadius={70} 
-                                  paddingAngle={5} 
-                                  dataKey="value"
-                                  stroke="none"
-                              >
-                                  {chartData.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={entry.color} />
-                                  ))}
-                              </Pie>
-                              <Tooltip 
-                                  formatter={(value: any) => formatCurrency(value)}
-                                  contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
-                              />
-                          </PieChart>
-                      </ResponsiveContainer>
-                    </div>
+                <div className="flex-1 w-full min-h-[300px] flex flex-col items-center relative">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                        <PieChart>
+                            <Pie 
+                                data={chartData} 
+                                cx="50%" 
+                                cy="50%" 
+                                innerRadius={60} 
+                                outerRadius={80} 
+                                paddingAngle={5} 
+                                dataKey="value"
+                                stroke="none"
+                            >
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                            <Tooltip 
+                                formatter={(value: any) => formatCurrency(value)}
+                                contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                            />
+                        </PieChart>
+                    </ResponsiveContainer>
                     
-                    <div className="w-full flex flex-wrap justify-center gap-x-4 gap-y-2 px-2 pb-2">
+                    <div className="w-full flex flex-wrap justify-center gap-x-4 gap-y-2 px-2 mt-4">
                         {chartData.map((item, idx) => (
                           <div key={idx} className="flex items-center gap-2 min-w-0">
                             <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }}></div>

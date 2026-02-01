@@ -20,13 +20,21 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Helper for generating UUIDs for manual record creation
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 const handleSupabaseError = (error: any, silent: boolean = false) => {
     if (!error) return null;
     
     const message = error.message || "";
     const code = error.code || "";
     
-    // Check if it's a genuine "Table Not Found" error
     const isMissingTable = message.includes("Could not find the table") || 
                            (message.includes("relation") && message.includes("does not exist")) ||
                            message.includes("schema cache") ||
@@ -44,7 +52,7 @@ const handleSupabaseError = (error: any, silent: boolean = false) => {
         console.error("Detailed Supabase Error:", error);
     }
     
-    if (message.includes("Invalid login credentials")) {
+    if (message.includes("Invalid login credentials") || message.includes("Email not found")) {
         return "Invalid email or password. Please check your credentials and try again.";
     }
     if (message.includes("Email address") && message.includes("invalid")) {
@@ -60,17 +68,16 @@ const handleSupabaseError = (error: any, silent: boolean = false) => {
     return message || "A database error occurred. Ensure your Supabase project is correctly configured.";
 };
 
-// Robust UUID validation
+// Standard UUID validation
 const isUUID = (str: any): boolean => {
   if (typeof str !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 };
 
 // Helper to remove invalid or empty IDs from payloads to avoid UUID syntax errors
 const sanitize = (data: any) => {
     if (!data || typeof data !== 'object') return data;
     const { id, ...rest } = data;
-    // If ID is blank or not a valid UUID string, we strip it so Supabase can generate a new one
     if (!id || id === "" || !isUUID(id)) return rest;
     return data;
 };
@@ -81,50 +88,74 @@ const sanitize = (data: any) => {
 
 const SupabaseService = {
   login: async (email: string, password: string): Promise<User | null> => {
+      const normalizedEmail = email.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+
       try {
-          const { data, error: authError } = await supabase.auth.signInWithPassword({ 
-              email, 
-              password 
+          // 1. Attempt Standard Supabase Auth (Official Users)
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
+              email: normalizedEmail, 
+              password: trimmedPassword 
           });
           
-          if (authError) throw authError;
+          if (!authError && authData.user) {
+              const uid = authData.user.id;
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', uid)
+                .single();
 
-          const uid = data.user?.id;
-          if (!uid) return null;
-
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', uid)
-            .single();
-
-          if (userError || !userData) {
-              handleSupabaseError(userError, true);
-              // Fallback if user profile doesn't exist in custom table yet
+              if (!userError && userData) {
+                  if (!userData.isActive) throw new Error("This account has been deactivated.");
+                  return userData as User;
+              }
+              
               return { 
                 id: uid, 
-                username: email.split('@')[0], 
-                email, 
+                username: normalizedEmail.split('@')[0], 
+                email: normalizedEmail, 
                 role: 'ADMIN', 
                 businessId: 'unknown', 
                 isActive: true, 
                 createdAt: Date.now() 
               };
           }
-          return userData as User;
+
+          // 2. Hybrid Fallback: Check 'users' table directly (Staff/Manual Users)
+          const { data: staffUser, error: staffError } = await supabase
+            .from('users')
+            .select('*')
+            .ilike('email', normalizedEmail)
+            .eq('password', trimmedPassword) 
+            .maybeSingle();
+
+          if (staffError) {
+              // Log the specific error if the database check fails (e.g. RLS issues)
+              console.error("Hybrid Login Table Check Error:", staffError);
+          }
+
+          if (staffUser) {
+              if (!staffUser.isActive) throw new Error("This account has been deactivated.");
+              return staffUser as User;
+          }
+
+          // If both fail, throw generic error
+          throw new Error("Invalid email or password.");
       } catch (error: any) {
           throw new Error(handleSupabaseError(error));
       }
   },
 
   signup: async (username: string, email: string, password: string): Promise<User | null> => {
+      const normalizedEmail = email.trim().toLowerCase();
       try {
-          if (!email || !email.includes('@')) {
+          if (!normalizedEmail || !normalizedEmail.includes('@')) {
               throw new Error("Invalid email format");
           }
 
           const { data, error: authError } = await supabase.auth.signUp({
-              email: email,
+              email: normalizedEmail,
               password: password || 'password123',
           });
           
@@ -137,16 +168,18 @@ const SupabaseService = {
           const newUser: User = { 
             id: uid,
             businessId: newBusinessId,
-            username,
-            email,
+            username: username.trim(),
+            email: normalizedEmail,
+            password: password.trim(), 
             role: 'ADMIN',
             isActive: true,
             createdAt: Date.now()
           }; 
 
-          const { error: insertError } = await supabase.from('users').upsert([newUser]);
+          const { error: insertError } = await supabase.from('users').upsert(newUser);
           if (insertError) {
-              handleSupabaseError(insertError, true);
+              handleSupabaseError(insertError, false);
+              throw insertError;
           }
 
           const { error: settingsError } = await supabase.from('settings').upsert({ 
@@ -180,8 +213,17 @@ const SupabaseService = {
 
   saveUser: async (user: User): Promise<void> => {
       try {
-          const { password, ...userData } = user;
-          const { error } = await supabase.from('users').upsert(sanitize(userData));
+          const userData = { ...user };
+          
+          if (!userData.id) {
+              userData.id = generateUUID();
+          }
+
+          // Normalize fields
+          if (userData.email) userData.email = userData.email.trim().toLowerCase();
+          if (userData.password) userData.password = userData.password.trim();
+
+          const { error } = await supabase.from('users').upsert(userData);
           if (error) throw error;
       } catch (e) {
           throw new Error(handleSupabaseError(e));

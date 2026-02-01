@@ -1,3 +1,4 @@
+
 /** @jsx React.createElement */
 /** @jsxFrag React.Fragment */
 import React, { useState, useEffect } from 'react';
@@ -14,6 +15,7 @@ export const Admin = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<User>>({});
+  const [newPassword, setNewPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [activeTab, setActiveTab] = useState<'users' | 'database'>('users');
   const [copied, setCopied] = useState(false);
@@ -33,17 +35,36 @@ export const Admin = () => {
     setErrorMsg('');
     
     try {
-        await Api.saveUser({
+        const isEditing = !!formData.id;
+        
+        // Final password to save
+        let passwordToSave = formData.password;
+
+        if (isEditing) {
+            // Only update password if a NEW one was provided in the extra state
+            if (newPassword.trim()) {
+                passwordToSave = newPassword.trim();
+            }
+            // else: passwordToSave remains what was loaded from the DB row
+        } else {
+            // New user: Use provided password or fallback to 'password'
+            passwordToSave = newPassword.trim() || 'password';
+        }
+
+        const userToSave: User = {
           ...formData,
           businessId: user.businessId, 
-          password: formData.password || 'password',
+          password: passwordToSave,
           isActive: formData.isActive ?? true,
           role: formData.role || 'CASHIER',
           createdAt: formData.createdAt || Date.now()
-        } as User);
+        } as User;
+
+        await Api.saveUser(userToSave);
         
         setIsModalOpen(false);
         setFormData({});
+        setNewPassword('');
         loadUsers();
     } catch (e: any) {
         setErrorMsg(e.message || "Failed to save user.");
@@ -82,49 +103,45 @@ export const Admin = () => {
   const sqlSchema = `-- ElifySIS Supabase Schema Initialization
 -- Run this in your Supabase SQL Editor
 
+-- 1. CLEANUP & UPDATES
+ALTER TABLE IF EXISTS "users" DROP CONSTRAINT IF EXISTS "users_id_fkey";
+ALTER TABLE IF EXISTS "users" DROP CONSTRAINT IF EXISTS "users_id_fkey1";
+
+-- 2. Users Table
 CREATE TABLE IF NOT EXISTS "users" (
-    "id" UUID PRIMARY KEY REFERENCES auth.users(id),
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "businessId" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "password" TEXT,
     "role" TEXT NOT NULL DEFAULT 'CASHIER',
     "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
     "createdAt" BIGINT NOT NULL
 );
 
+-- 3. SECURITY: Enable RLS but add a Public Access Policy for Login
+ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Enable read access for all users" ON "users";
+CREATE POLICY "Enable read access for all users" ON "users" FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Enable insert for all users" ON "users";
+CREATE POLICY "Enable insert for all users" ON "users" FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Enable update for all users" ON "users";
+CREATE POLICY "Enable update for all users" ON "users" FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Enable delete for all users" ON "users";
+CREATE POLICY "Enable delete for all users" ON "users" FOR DELETE USING (true);
+
+-- 4. STANDARD TABLES
 CREATE TABLE IF NOT EXISTS "categories" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "name" TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS "expenseCategories" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "name" TEXT NOT NULL);
-
-CREATE TABLE IF NOT EXISTS "products" (
-    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    "businessId" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "quantity" INTEGER DEFAULT 0,
-    "buyPrice" NUMERIC(15, 2) DEFAULT 0,
-    "sellPrice" NUMERIC(15, 2) DEFAULT 0,
-    "category" TEXT,
-    "supplierId" TEXT,
-    "lastUpdated" BIGINT
-);
-
+CREATE TABLE IF NOT EXISTS "products" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "name" TEXT NOT NULL, "description" TEXT, "quantity" INTEGER DEFAULT 0, "buyPrice" NUMERIC(15, 2) DEFAULT 0, "sellPrice" NUMERIC(15, 2) DEFAULT 0, "category" TEXT, "supplierId" TEXT, "lastUpdated" BIGINT);
 CREATE TABLE IF NOT EXISTS "customers" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "firstName" TEXT NOT NULL, "lastName" TEXT NOT NULL, "phone" TEXT, "email" TEXT, "address" TEXT, "createdAt" BIGINT NOT NULL);
 CREATE TABLE IF NOT EXISTS "employees" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "firstName" TEXT NOT NULL, "lastName" TEXT NOT NULL, "gender" TEXT, "email" TEXT, "phone" TEXT, "jobRole" TEXT, "hiredDate" TEXT, "address" TEXT, "createdAt" BIGINT NOT NULL);
 CREATE TABLE IF NOT EXISTS "suppliers" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "name" TEXT NOT NULL, "phone" TEXT, "address" TEXT, "createdAt" BIGINT NOT NULL);
-
-CREATE TABLE IF NOT EXISTS "sales" (
-    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    "businessId" TEXT NOT NULL,
-    "ticketId" TEXT NOT NULL,
-    "customerId" TEXT,
-    "customerName" TEXT,
-    "items" JSONB NOT NULL DEFAULT '[]'::jsonb,
-    "totalAmount" NUMERIC(15, 2) DEFAULT 0,
-    "date" BIGINT NOT NULL,
-    "paymentMethod" TEXT,
-    "status" TEXT DEFAULT 'Pending'
-);
-
+CREATE TABLE IF NOT EXISTS "sales" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "ticketId" TEXT NOT NULL, "customerId" TEXT, "customerName" TEXT, "items" JSONB NOT NULL DEFAULT '[]'::jsonb, "totalAmount" NUMERIC(15, 2) DEFAULT 0, "date" BIGINT NOT NULL, "paymentMethod" TEXT, "status" TEXT DEFAULT 'Pending');
 CREATE TABLE IF NOT EXISTS "expenses" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "name" TEXT NOT NULL, "amount" NUMERIC(15, 2) DEFAULT 0, "date" BIGINT NOT NULL, "category" TEXT);
 CREATE TABLE IF NOT EXISTS "stockLogs" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "businessId" TEXT NOT NULL, "productId" TEXT NOT NULL, "productName" TEXT NOT NULL, "change" INTEGER NOT NULL, "type" TEXT NOT NULL, "date" BIGINT NOT NULL, "balance" INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS "settings" ("businessId" TEXT PRIMARY KEY, "currency" TEXT DEFAULT 'USD', "currencySymbol" TEXT DEFAULT '$');
@@ -134,6 +151,13 @@ CREATE TABLE IF NOT EXISTS "notifications" ("id" UUID PRIMARY KEY DEFAULT gen_ra
     navigator.clipboard.writeText(sqlSchema);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleEditClick = (u: User) => {
+      setFormData(u);
+      setNewPassword(''); // Clear new password input for edits
+      setIsModalOpen(true);
+      setErrorMsg('');
   };
 
   return (
@@ -169,8 +193,7 @@ CREATE TABLE IF NOT EXISTS "notifications" ("id" UUID PRIMARY KEY DEFAULT gen_ra
                                     label="System Currency" 
                                     value={settings.currency} 
                                     onChange={(e) => {
-                                        // Update currency and try to match a symbol automatically
-                                        const symbols: Record<string, string> = { 'USD': '$', 'EUR': '€', 'GBP': '£', 'NGN': '₦', 'GHS': 'GH₵', 'KES': 'KSh', 'INR': '₹', 'ZAR': 'R', 'CAD': 'CA$', 'AUD': 'AU$' };
+                                        const symbols: Record<string, string> = { 'NGN': '₦', 'USD': '$', 'EUR': '€', 'GBP': '£', 'KES': 'KSh', 'GHS': 'GH₵', 'INR': '₹', 'ZAR': 'R', 'CAD': 'CA$', 'AUD': 'AU$' };
                                         updateSettings({ 
                                             currency: e.target.value,
                                             currencySymbol: symbols[e.target.value] || e.target.value 
@@ -201,7 +224,7 @@ CREATE TABLE IF NOT EXISTS "notifications" ("id" UUID PRIMARY KEY DEFAULT gen_ra
                 <h2 className="text-2xl font-bold text-textPrimary dark:text-white">User Accounts</h2>
                 <p className="text-textSecondary dark:text-gray-400">Control who can access your system.</p>
              </div>
-             <Button onClick={() => { setFormData({}); setIsModalOpen(true); setErrorMsg(''); }} className="gap-2">
+             <Button onClick={() => { setFormData({}); setNewPassword(''); setIsModalOpen(true); setErrorMsg(''); }} className="gap-2">
                 <UserPlus size={18} /> Add User
              </Button>
           </div>
@@ -261,7 +284,7 @@ CREATE TABLE IF NOT EXISTS "notifications" ("id" UUID PRIMARY KEY DEFAULT gen_ra
                     >
                         <Power size={18}/>
                     </button>
-                    <button onClick={() => { setFormData(userItem); setIsModalOpen(true); setErrorMsg(''); }} className="text-blue-600 border border-blue-100 hover:bg-blue-50 p-1.5 rounded-lg"><Edit size={18}/></button>
+                    <button onClick={() => handleEditClick(userItem)} className="text-blue-600 border border-blue-100 hover:bg-blue-50 p-1.5 rounded-lg"><Edit size={18}/></button>
                     <button 
                       onClick={() => openDeleteModal(userItem.id)} 
                       className={`p-1.5 rounded-lg border ${userItem.id === user?.id ? 'text-gray-300 border-gray-100 cursor-not-allowed' : 'text-red-500 border-red-100 hover:bg-red-50'}`}
@@ -298,17 +321,6 @@ CREATE TABLE IF NOT EXISTS "notifications" ("id" UUID PRIMARY KEY DEFAULT gen_ra
               </div>
             </div>
           </Card>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <h4 className="font-bold text-sm text-textPrimary dark:text-white mb-2 uppercase tracking-wider">Step 1: SQL Editor</h4>
-              <p className="text-xs text-textSecondary dark:text-gray-400">Open your Supabase project dashboard, navigate to the "SQL Editor" on the left sidebar, and create a "New Query".</p>
-            </Card>
-            <Card>
-              <h4 className="font-bold text-sm text-textPrimary dark:text-white mb-2 uppercase tracking-wider">Step 2: Execution</h4>
-              <p className="text-xs text-textSecondary dark:text-gray-400">Paste the copied code and click "Run". The tables will be created if they don't already exist, and all camelCase columns will be matched.</p>
-            </Card>
-          </div>
         </div>
       )}
 
@@ -325,7 +337,18 @@ CREATE TABLE IF NOT EXISTS "notifications" ("id" UUID PRIMARY KEY DEFAULT gen_ra
            {errorMsg && <div className="p-3 bg-red-100 text-red-700 rounded-xl text-xs font-bold border border-red-200">{errorMsg}</div>}
            <Input label="Display Username" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
            <Input label="Authentication Email" type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
-           <Input label="Login Password" type="password" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={formData.id ? "Leave blank to keep current" : "Set initial password"} />
+           
+           <div className="space-y-1.5">
+             <label className="block text-sm font-medium text-textSecondary dark:text-gray-400">{formData.id ? "Change Password" : "Set Password"}</label>
+             <input 
+               type="password" 
+               className="w-full px-4 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white placeholder-gray-400 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+               value={newPassword}
+               onChange={e => setNewPassword(e.target.value)}
+               placeholder={formData.id ? "Leave empty to keep current" : "Default is 'password'"}
+             />
+             <p className="text-[10px] text-gray-500 italic mt-1">Passwords are stored in the public.users table for staff access.</p>
+           </div>
            
            <Select 
              label="Access Role" 

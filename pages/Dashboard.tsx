@@ -99,11 +99,11 @@ export const Dashboard = () => {
 
       {!isRestricted ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="h-80 flex flex-col min-w-0 overflow-hidden">
+          <Card className="min-h-[400px] flex flex-col min-w-0 overflow-hidden">
             <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter truncate mb-4">Revenue Trends</h3>
-            <div className="flex-1 w-full min-h-0 overflow-hidden">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salesData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+            <div className="flex-1 w-full min-h-[300px] relative">
+              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                <LineChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                   <XAxis 
                       dataKey="name" 
@@ -124,11 +124,11 @@ export const Dashboard = () => {
             </div>
           </Card>
 
-          <Card className="h-80 flex flex-col min-w-0 overflow-hidden">
+          <Card className="min-h-[400px] flex flex-col min-w-0 overflow-hidden">
             <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter truncate mb-4">Daily Volume</h3>
-            <div className="flex-1 w-full min-h-0 overflow-hidden">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={salesData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+            <div className="flex-1 w-full min-h-[300px] relative">
+              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                <BarChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                   <XAxis 
                       dataKey="name" 

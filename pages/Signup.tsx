@@ -35,7 +35,8 @@ export const Signup = () => {
 
     setIsLoading(true);
 
-    const result = await signup(formData.username, formData.email, formData.password);
+    // email normalization happens within the signup service, but good to be explicit
+    const result = await signup(formData.username.trim(), formData.email.trim().toLowerCase(), formData.password.trim());
     if (result.success) {
       navigate('/dashboard');
     } else {

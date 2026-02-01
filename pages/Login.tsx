@@ -20,7 +20,8 @@ export const Login = () => {
     setError('');
     setIsLoading(true);
 
-    const result = await login(email, password);
+    // Normalize inputs: Trim and Lowercase email
+    const result = await login(email.trim().toLowerCase(), password.trim());
     if (result.success) {
       navigate('/dashboard');
     } else {
