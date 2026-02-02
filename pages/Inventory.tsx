@@ -1,3 +1,4 @@
+
 /** @jsx React.createElement */
 /** @jsxFrag React.Fragment */
 import React, { useState, useEffect, useRef } from 'react';
@@ -7,6 +8,7 @@ import { Product, Supplier, Category } from '../types';
 import { Plus, Trash2, Edit, Upload, FileDown, Filter, Settings2, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import Papa from 'papaparse';
 
 export const Inventory = () => {
   const { user } = useAuth();
@@ -121,13 +123,14 @@ export const Inventory = () => {
   };
 
   const downloadTemplate = () => {
-      const headers = "Name,Description,Quantity,BuyPrice,SellPrice,Category,SupplierId";
-      const example = "Sample Product,A great item,100,5.00,10.00,General,";
-      const blob = new Blob([headers + "\n" + example], { type: 'text/csv' });
+      const headers = ["Name", "Description", "Quantity", "BuyPrice", "SellPrice", "Category", "SupplierId"];
+      const example = ["Sample Product", "A great item", "100", "5.00", "10.00", "General", ""];
+      const csv = Papa.unparse([headers, example]);
+      const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = "inventory_import_template.csv";
+      a.download = "elifysis_inventory_template.csv";
       a.click();
   };
 
@@ -135,54 +138,83 @@ export const Inventory = () => {
       const file = event.target.files?.[0];
       if (!file || !user) return;
 
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-          const text = e.target?.result as string;
-          if (!text) return;
+      Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async (results) => {
+              const rows = results.data as any[];
+              if (rows.length === 0) {
+                  alert("No data found in CSV.");
+                  return;
+              }
 
-          const rows = text.split('\n').map(row => row.trim()).filter(row => row.length > 0);
-          if (rows.length < 2) {
-              alert("Invalid CSV format");
-              return;
-          }
+              // Mapping logic to find column names case-insensitively
+              const fields = results.meta.fields || [];
+              const findKey = (candidates: string[]) => 
+                  fields.find(f => candidates.some(c => f.toLowerCase() === c.toLowerCase()));
 
-          const newProducts: Product[] = [];
-          for (let i = 1; i < rows.length; i++) {
-              const cols = rows[i].split(',');
-              if (cols.length < 5) continue;
+              const nameKey = findKey(['name', 'product name', 'item']);
+              const descKey = findKey(['description', 'desc']);
+              const qtyKey = findKey(['quantity', 'qty', 'stock']);
+              const buyKey = findKey(['buyprice', 'buy price', 'cost']);
+              const sellKey = findKey(['sellprice', 'sell price', 'price']);
+              const catKey = findKey(['category', 'type']);
+              const supKey = findKey(['supplierid', 'supplier', 'vendor']);
 
-              const p: any = {
-                  businessId: user.businessId,
-                  name: cols[0]?.trim(),
-                  description: cols[1]?.trim() || '',
-                  quantity: parseInt(cols[2]?.trim()) || 0,
-                  buyPrice: parseFloat(cols[3]?.trim()) || 0,
-                  sellPrice: parseFloat(cols[4]?.trim()) || 0,
-                  category: cols[5]?.trim() || 'General',
-                  supplierId: cols[6]?.trim() || '',
-                  lastUpdated: Date.now()
-              };
-              
-              if (p.name) newProducts.push(p);
-          }
+              if (!nameKey) {
+                  alert("CSV Error: Could not find a 'Name' column.");
+                  return;
+              }
 
-          if (newProducts.length > 0) {
-              if (window.confirm(`Found ${newProducts.length} valid products. Import them?`)) {
-                  try {
-                      await Api.importProducts(newProducts);
-                      alert("Import successful!");
-                      loadData();
-                  } catch (err: any) {
-                      alert("Import failed: " + err.message);
+              const existingNames = new Set(products.map(p => p.name.toLowerCase().trim()));
+              const newProducts: Product[] = [];
+              let skippedCount = 0;
+
+              for (const row of rows) {
+                  const productName = String(row[nameKey] || '').trim();
+                  if (!productName) continue;
+
+                  // Skip if already exists
+                  if (existingNames.has(productName.toLowerCase())) {
+                      skippedCount++;
+                      continue;
+                  }
+
+                  newProducts.push({
+                      businessId: user.businessId,
+                      name: productName,
+                      description: String(row[descKey] || '').trim(),
+                      quantity: parseInt(row[qtyKey]) || 0,
+                      buyPrice: parseFloat(row[buyKey]) || 0,
+                      sellPrice: parseFloat(row[sellKey]) || 0,
+                      category: String(row[catKey] || 'General').trim(),
+                      supplierId: String(row[supKey] || '').trim(),
+                      lastUpdated: Date.now()
+                  } as Product);
+              }
+
+              if (newProducts.length > 0) {
+                  const skipMsg = skippedCount > 0 ? ` (${skippedCount} existing items were skipped)` : "";
+                  if (window.confirm(`Found ${newProducts.length} new valid products${skipMsg}. Import them?`)) {
+                      try {
+                          await Api.importProducts(newProducts);
+                          alert("Import successful!");
+                          loadData();
+                      } catch (err: any) {
+                          alert("Import failed: " + err.message);
+                      }
+                  }
+              } else {
+                  if (skippedCount > 0) {
+                      alert(`All items in this CSV already exist in your inventory. No new items imported.`);
+                  } else {
+                      alert("No valid new products found in CSV.");
                   }
               }
-          } else {
-              alert("No valid products found in CSV.");
+              
+              if (fileInputRef.current) fileInputRef.current.value = "";
           }
-          
-          if (fileInputRef.current) fileInputRef.current.value = "";
-      };
-      reader.readAsText(file);
+      });
   };
 
   const filteredProducts = products.filter(p => {
@@ -242,8 +274,8 @@ export const Inventory = () => {
             {activeTab === 'products' && (
                 <>
                     <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                    <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2"><Upload size={16}/> Import</Button>
-                    <Button variant="ghost" size="sm" onClick={downloadTemplate} className="gap-2 text-primary"><FileDown size={16}/> Template</Button>
+                    <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2"><Upload size={16}/> Import CSV</Button>
+                    <Button variant="ghost" size="sm" onClick={downloadTemplate} className="gap-2 text-primary font-bold"><FileDown size={16}/> Template</Button>
                     <div className="h-6 w-px bg-gray-300 mx-2 hidden lg:block"></div>
                     <select className="bg-slate-700 text-white border border-slate-600 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider outline-none focus:border-primary" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
                         <option value="">All Categories</option>
@@ -261,42 +293,44 @@ export const Inventory = () => {
          </Button>
       </div>
 
-      {activeTab === 'products' && (
-        <DataTable 
-          title="Stock Ledger" 
-          data={filteredProducts} 
-          columns={productColumns} 
-          actions={(item) => (
-             <div className="flex justify-end gap-2">
-                 <button className="text-slate-400 hover:text-primary p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => openAdjustStock(item)} title="Quick Adjust Stock"><Activity size={16} /></button>
-                 <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
-                 <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'product')}><Trash2 size={16}/></button>
-             </div>
+      <div className="min-w-0">
+          {activeTab === 'products' && (
+            <DataTable 
+              title="Stock Ledger" 
+              data={filteredProducts} 
+              columns={productColumns} 
+              actions={(item) => (
+                 <div className="flex justify-end gap-2">
+                     <button className="text-slate-400 hover:text-primary p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => openAdjustStock(item)} title="Quick Adjust Stock"><Activity size={16} /></button>
+                     <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
+                     <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'product')}><Trash2 size={16}/></button>
+                 </div>
+              )}
+            />
           )}
-        />
-      )}
 
-      {activeTab === 'suppliers' && (
-        <DataTable title="Authorized Suppliers" data={suppliers} columns={supplierColumns}
-          actions={(item) => (
-             <div className="flex justify-end gap-2">
-                 <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
-                 <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'supplier')}><Trash2 size={16}/></button>
-             </div>
-          )} 
-        />
-      )}
+          {activeTab === 'suppliers' && (
+            <DataTable title="Authorized Suppliers" data={suppliers} columns={supplierColumns}
+              actions={(item) => (
+                 <div className="flex justify-end gap-2">
+                     <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
+                     <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'supplier')}><Trash2 size={16}/></button>
+                 </div>
+              )} 
+            />
+          )}
 
-      {activeTab === 'categories' && (
-          <DataTable title="Item Groupings" data={categories} columns={categoryColumns}
-            actions={(item) => (
-                <div className="flex justify-end gap-2">
-                    <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
-                    <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'category')}><Trash2 size={16}/></button>
-                </div>
-            )}
-          />
-      )}
+          {activeTab === 'categories' && (
+              <DataTable title="Item Groupings" data={categories} columns={categoryColumns}
+                actions={(item) => (
+                    <div className="flex justify-end gap-2">
+                        <button className="text-blue-600 hover:text-blue-800 p-1.5 rounded-lg hover:bg-blue-50 transition-colors" onClick={() => { setFormData(item); setIsModalOpen(true); }}><Edit size={16}/></button>
+                        <button className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => openDeleteModal(item.id, 'category')}><Trash2 size={16}/></button>
+                    </div>
+                )}
+              />
+          )}
+      </div>
 
       <ConfirmationModal isOpen={deleteModal.isOpen} onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })} onConfirm={confirmDelete} title="Confirm Deletion" message="This action is irreversible. All associated records may be affected." />
 
