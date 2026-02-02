@@ -218,14 +218,14 @@ export const Finance = () => {
         </div>
 
         <div className="space-y-6 min-w-0">
-            <Card className="min-h-[420px] flex flex-col bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-xl rounded-3xl overflow-hidden p-6">
-                <div className="mb-6">
+            <Card className="min-h-[340px] flex flex-col bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-xl rounded-3xl overflow-hidden p-6">
+                <div className="mb-3">
                     <h3 className="font-black text-slate-800 dark:text-white uppercase tracking-tighter truncate text-lg">Budget Allocation</h3>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Revenue vs Periodic Spend</p>
                 </div>
                 
-                <div className="flex-1 w-full min-h-[300px] flex flex-col items-center relative">
-                    <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                <div className="flex-1 w-full min-h-[200px] flex flex-col items-center relative">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                         <PieChart>
                             <Pie 
                                 data={chartData} 
@@ -248,7 +248,7 @@ export const Finance = () => {
                         </PieChart>
                     </ResponsiveContainer>
                     
-                    <div className="w-full flex flex-wrap justify-center gap-x-4 gap-y-2 px-2 mt-4">
+                    <div className="w-full flex flex-wrap justify-center gap-x-4 gap-y-2 px-2 mt-2">
                         {chartData.map((item, idx) => (
                           <div key={idx} className="flex items-center gap-2 min-w-0">
                             <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }}></div>
@@ -260,7 +260,7 @@ export const Finance = () => {
                     </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center">
                     <div className="min-w-0 flex-1">
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Filtered Expenditure</p>
                         <p className="text-xl font-black text-red-500 tracking-tighter truncate leading-none">{formatCurrency(filteredExpenseTotal)}</p>

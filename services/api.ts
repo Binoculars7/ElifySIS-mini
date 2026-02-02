@@ -636,13 +636,16 @@ const SupabaseService = {
               totalExpenses += (exp.amount || 0);
           });
           
+          const lowStockProducts = p.filter(prod => prod.quantity < 10);
+          
           return {
               productCount: p.length, customerCount: c.length, saleCount: s.length,
               totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses,
-              lowStockCount: p.filter(prod => prod.quantity < 10).length
+              lowStockCount: lowStockProducts.length,
+              lowStockNames: lowStockProducts.map(prod => prod.name)
           };
       } catch (err) {
-          return { productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0 };
+          return { productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0, lowStockNames: [] };
       }
   },
 
@@ -732,7 +735,7 @@ const MockService = {
   getEmployees: async () => [], saveEmployee: async () => {}, deleteEmployee: async () => {},
   getSuppliers: async () => [], saveSupplier: async () => {}, deleteSupplier: async () => {},
   getExpenses: async () => [], addExpense: async () => {}, deleteExpense: async () => {},
-  getDashboardStats: async () => ({ productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0 }),
+  getDashboardStats: async () => ({ productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0, lowStockNames: [] }),
   getSettings: async () => ({ businessId: '', currency: 'USD', currencySymbol: '$' }),
   saveSettings: async () => {}, getNotifications: async () => [], saveNotification: async () => {},
   markNotificationRead: async () => {}

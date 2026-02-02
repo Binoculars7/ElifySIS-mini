@@ -40,10 +40,15 @@ export const Dashboard = () => {
       const sales = await Api.getSales(user.businessId);
       setStats(s);
 
-      if (s.lowStockCount > 0) {
+      if (s.lowStockCount > 0 && s.lowStockNames) {
           const hasNotified = sessionStorage.getItem('lowStockNotified');
           if (!hasNotified) {
-              notify(`Warning: ${s.lowStockCount} products are running low on stock!`, 'warning', 'Low Inventory Alert');
+              const productList = s.lowStockNames.join(', ');
+              const message = s.lowStockCount === 1 
+                ? `Warning: "${productList}" is running low on stock!` 
+                : `Warning: ${s.lowStockCount} items are running low: ${productList}`;
+              
+              notify(message, 'warning', 'Low Inventory Alert');
               sessionStorage.setItem('lowStockNotified', 'true');
           }
       }
