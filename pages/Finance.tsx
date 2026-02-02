@@ -6,7 +6,7 @@ import { Card, DataTable, Button, Input, Modal, Select, ConfirmationModal } from
 import { Api } from '../services/api';
 import { Expense, ExpenseCategory } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { TrendingDown, TrendingUp, DollarSign, Trash2, Calendar, Search, Tag, Settings2, Plus, LayoutGrid, X } from 'lucide-react';
+import { TrendingDown, TrendingUp, DollarSign, Trash2, Calendar, Search, Tag, Settings2, Plus, LayoutGrid, X, ReceiptText, ChevronRight, Hash, Layers } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 
@@ -108,25 +108,25 @@ export const Finance = () => {
   }, [filteredExpenses]);
 
   const chartData = [
-    { name: 'Income (Total)', value: stats.income, color: '#1A73E8' },
-    { name: 'Expenses (Filtered)', value: filteredExpenseTotal, color: '#EF4444' },
-    { name: 'Net Balance', value: Math.max(0, stats.income - filteredExpenseTotal), color: '#22C55E' },
+    { name: 'Income', value: stats.income, color: '#1A73E8' },
+    { name: 'Expense', value: filteredExpenseTotal, color: '#EF4444' },
+    { name: 'Net', value: Math.max(0, stats.income - filteredExpenseTotal), color: '#22C55E' },
   ].filter(d => d.value > 0);
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-l-4 border-green-500 bg-white dark:bg-slate-800 min-w-0">
-           <p className="text-slate-500 dark:text-gray-400 text-xs font-black uppercase tracking-widest mb-2 flex items-center gap-2 truncate"><TrendingUp size={14}/> Gross Income</p>
-           <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{formatCurrency(stats.income)}</h3>
+        <Card className="border-l-4 border-green-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
+           <p className="text-slate-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 truncate">Gross Income</p>
+           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(stats.income)}</h3>
         </Card>
-        <Card className="border-l-4 border-red-500 bg-white dark:bg-slate-800 min-w-0">
-           <p className="text-slate-500 dark:text-gray-400 text-xs font-black uppercase tracking-widest mb-2 flex items-center gap-2 truncate"><TrendingDown size={14}/> Expenditure</p>
-           <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{formatCurrency(stats.expense)}</h3>
+        <Card className="border-l-4 border-red-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
+           <p className="text-slate-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 truncate">Expenditure</p>
+           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(stats.expense)}</h3>
         </Card>
-        <Card className="border-l-4 border-blue-500 bg-white dark:bg-slate-800 min-w-0">
-           <p className="text-slate-500 dark:text-gray-400 text-xs font-black uppercase tracking-widest mb-2 flex items-center gap-2 truncate"><DollarSign size={14}/> Net Profit</p>
-           <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{formatCurrency(stats.profit)}</h3>
+        <Card className="border-l-4 border-blue-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
+           <p className="text-slate-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 truncate">Net Profit</p>
+           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(stats.profit)}</h3>
         </Card>
       </div>
 
@@ -135,7 +135,7 @@ export const Finance = () => {
               <div className="lg:col-span-5">
                   <p className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-2">Audit Period</p>
                   <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <div className="relative w-full h-11 bg-slate-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl group hover:border-primary transition-colors flex items-center px-4 overflow-hidden">
+                    <div className="relative w-full h-11 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg group hover:border-primary transition-colors flex items-center px-4 overflow-hidden shadow-sm">
                         <Calendar className="text-primary mr-3 flex-shrink-0" size={16} />
                         <span className="text-sm font-bold text-slate-700 dark:text-white pointer-events-none truncate">
                             {formatDisplayDate(startDate)}
@@ -148,7 +148,7 @@ export const Finance = () => {
                         />
                     </div>
                     <span className="text-gray-400 font-bold hidden sm:inline text-sm">to</span>
-                    <div className="relative w-full h-11 bg-slate-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl group hover:border-primary transition-colors flex items-center px-4 overflow-hidden">
+                    <div className="relative w-full h-11 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg group hover:border-primary transition-colors flex items-center px-4 overflow-hidden shadow-sm">
                         <Calendar className="text-primary mr-3 flex-shrink-0" size={16} />
                         <span className="text-sm font-bold text-slate-700 dark:text-white pointer-events-none truncate">
                             {formatDisplayDate(endDate)}
@@ -170,7 +170,7 @@ export const Finance = () => {
                     <input 
                       type="text"
                       placeholder="Name or category..."
-                      className="w-full pl-10 h-11 rounded-xl border border-gray-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full pl-10 h-11 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary/10 shadow-sm"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -178,10 +178,10 @@ export const Finance = () => {
               </div>
 
               <div className="lg:col-span-3 flex gap-2">
-                  <Button onClick={() => setIsExpenseModalOpen(true)} className="flex-1 h-11 gap-2 font-black uppercase text-xs truncate">
+                  <Button onClick={() => setIsExpenseModalOpen(true)} className="flex-1 h-11 gap-2 font-bold uppercase text-xs truncate bg-black hover:bg-slate-800 text-white border-none rounded-lg shadow-sm">
                     <Plus size={16}/> Record Expense
                   </Button>
-                  <Button onClick={() => setIsCatModalOpen(true)} variant="secondary" className="h-11 px-3 border-gray-200 dark:border-slate-600" title="Manage Categories">
+                  <Button onClick={() => setIsCatModalOpen(true)} variant="secondary" className="h-11 px-3 border-gray-200 dark:border-slate-600 rounded-lg shadow-sm" title="Categories">
                     <Settings2 size={18}/>
                   </Button>
               </div>
@@ -195,17 +195,17 @@ export const Finance = () => {
                 data={filteredExpenses}
                 columns={[
                     { header: 'Description', accessor: (e) => (
-                        <div className="truncate max-w-[150px] sm:max-w-[250px] font-black text-slate-800 dark:text-white" title={e.name}>
+                        <div className="truncate max-w-[150px] sm:max-w-[250px] font-bold text-slate-800 dark:text-white" title={e.name}>
                           {e.name}
                         </div>
                     ) },
                     { header: 'Category', accessor: (e) => (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase truncate max-w-[80px]" title={e.category}>
-                            <Tag size={10} className="flex-shrink-0"/> {e.category}
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-gray-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase">
+                            {e.category}
                         </span>
                     ) },
-                    { header: 'Date', accessor: (e) => new Date(e.date).toLocaleDateString(), className: 'font-mono text-slate-400 whitespace-nowrap text-xs' },
-                    { header: 'Amount', accessor: (e) => <span className="truncate">{formatCurrency(e.amount)}</span>, className: 'text-red-600 dark:text-red-400 font-black text-right' }
+                    { header: 'Date', accessor: (e) => new Date(e.date).toLocaleDateString(), className: 'text-slate-400 whitespace-nowrap text-xs' },
+                    { header: 'Amount', accessor: (e) => <span className="truncate">{formatCurrency(e.amount)}</span>, className: 'text-red-600 font-bold text-right' }
                 ]}
                 actions={(item) => (
                     <div className="flex justify-end">
@@ -218,10 +218,9 @@ export const Finance = () => {
         </div>
 
         <div className="space-y-6 min-w-0">
-            <Card className="min-h-[340px] flex flex-col bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-xl rounded-3xl overflow-hidden p-6">
+            <Card className="min-h-[340px] flex flex-col bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-none rounded-2xl p-6">
                 <div className="mb-3">
-                    <h3 className="font-black text-slate-800 dark:text-white uppercase tracking-tighter truncate text-lg">Budget Allocation</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Revenue vs Periodic Spend</p>
+                    <h3 className="font-bold text-slate-800 dark:text-white uppercase tracking-tight truncate text-lg">Allocation</h3>
                 </div>
                 
                 <div className="flex-1 w-full min-h-[200px] flex flex-col items-center relative">
@@ -243,7 +242,7 @@ export const Finance = () => {
                             </Pie>
                             <Tooltip 
                                 formatter={(value: any) => formatCurrency(value)}
-                                contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                contentStyle={{ backgroundColor: '#fff', border: '1px solid #eee', borderRadius: '8px', color: '#000', fontSize: '12px', fontWeight: 'bold' }}
                             />
                         </PieChart>
                     </ResponsiveContainer>
@@ -251,22 +250,12 @@ export const Finance = () => {
                     <div className="w-full flex flex-wrap justify-center gap-x-4 gap-y-2 px-2 mt-2">
                         {chartData.map((item, idx) => (
                           <div key={idx} className="flex items-center gap-2 min-w-0">
-                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }}></div>
-                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate max-w-[100px]" title={item.name}>
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">
                               {item.name}
                             </span>
                           </div>
                         ))}
-                    </div>
-                </div>
-
-                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center">
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Filtered Expenditure</p>
-                        <p className="text-xl font-black text-red-500 tracking-tighter truncate leading-none">{formatCurrency(filteredExpenseTotal)}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-600 dark:text-red-400 flex-shrink-0 shadow-sm border border-red-100 dark:border-red-900/30">
-                        <TrendingDown size={20}/>
                     </div>
                 </div>
             </Card>
@@ -276,109 +265,113 @@ export const Finance = () => {
       <ConfirmationModal 
         isOpen={!!deleteId} 
         onClose={() => setDeleteId(null)} 
-        onConfirm={confirmDelete}
-        title="Delete Record"
-        message="This will remove the transaction from the ledger forever. Are you absolutely certain?"
+        onConfirm={confirmDelete} 
+        title="Remove Entry" 
+        message="This will permanently delete this record from the ledger."
       />
 
-      <Modal title="Record Store Expense" isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)}>
-         <div className="space-y-4">
-            <Input label="Description" value={newExpense.name || ''} onChange={e => setNewExpense({...newExpense, name: e.target.value})} placeholder="e.g., Monthly Electric Bill" />
-            <Input label="Amount (Value)" type="number" value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: parseFloat(e.target.value)})} placeholder="0.00" />
-            
-            <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-500 dark:text-gray-400">Category Selection</label>
-                <div className="flex gap-2">
-                    <select 
-                        className="flex-1 px-4 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer min-w-0"
-                        value={newExpense.category || ''} 
-                        onChange={e => setNewExpense({...newExpense, category: e.target.value})}
-                    >
-                        {categories.length === 0 && <option value="Uncategorized">Uncategorized</option>}
-                        {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                    </select>
-                    <button onClick={() => { setIsExpenseModalOpen(false); setIsCatModalOpen(true); }} className="p-2.5 bg-slate-100 dark:bg-slate-600 rounded-lg text-slate-600 dark:text-gray-300 hover:text-primary transition-colors flex-shrink-0" title="Manage categories">
-                        <Settings2 size={20}/>
-                    </button>
+      {/* Simplified Add Expense Modal */}
+      <Modal title="Add New Expense" isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)}>
+         <div className="space-y-5 py-2">
+            <div className="space-y-4">
+                <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Description</label>
+                    <input 
+                       className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium text-sm outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
+                       placeholder="e.g., Office Supplies"
+                       value={newExpense.name || ''}
+                       onChange={e => setNewExpense({...newExpense, name: e.target.value})}
+                    />
+                </div>
+                
+                <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Amount</label>
+                    <input 
+                       type="number"
+                       className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium text-sm outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
+                       placeholder="0.00"
+                       value={newExpense.amount || ''}
+                       onChange={e => setNewExpense({...newExpense, amount: parseFloat(e.target.value)})}
+                    />
+                </div>
+                
+                <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Category</label>
+                    <div className="flex gap-2">
+                        <select 
+                            className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-bold text-sm outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm cursor-pointer"
+                            value={newExpense.category || ''} 
+                            onChange={e => setNewExpense({...newExpense, category: e.target.value})}
+                        >
+                            {categories.length === 0 && <option value="Uncategorized">Uncategorized</option>}
+                            {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                        </select>
+                        <button 
+                            onClick={() => { setIsExpenseModalOpen(false); setIsCatModalOpen(true); }} 
+                            className="w-12 h-12 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-slate-400 hover:text-black dark:hover:text-white transition-all flex items-center justify-center flex-shrink-0 shadow-sm"
+                        >
+                            <Plus size={20}/>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-8">
-                 <Button variant="secondary" onClick={() => setIsExpenseModalOpen(false)} className="w-full">Cancel</Button>
-                 <Button onClick={handleAddExpense} className="w-full">Authorize Record</Button>
+            <div className="pt-6 flex gap-3">
+                 <button onClick={() => setIsExpenseModalOpen(false)} className="flex-1 h-12 rounded-xl font-bold text-slate-400 hover:text-slate-600 uppercase text-xs tracking-widest transition-colors">Cancel</button>
+                 <button onClick={handleAddExpense} className="flex-1 h-12 rounded-xl font-bold uppercase text-xs tracking-widest bg-black text-white hover:bg-slate-800 shadow-lg shadow-black/10 transition-all active:scale-95">Add Expense</button>
             </div>
          </div>
       </Modal>
 
-      <Modal title="Expense Categories" isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)}>
-          <div className="space-y-8 py-2">
-              <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-700 shadow-inner">
-                  <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-primary/10 text-primary rounded-lg">
-                          <Plus size={18} />
-                      </div>
-                      <p className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em]">Add Custom Category</p>
-                  </div>
-                  <div className="flex gap-2">
-                      <input 
-                        className="flex-1 px-5 py-3 rounded-2xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm outline-none focus:ring-4 focus:ring-primary/10 transition-all placeholder-slate-300 dark:placeholder-slate-500 min-w-0"
-                        placeholder="e.g., Marketing, Logistics..."
-                        value={newCategoryName}
-                        onChange={e => setNewCategoryName(e.target.value)}
-                        onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
-                      />
-                      <button 
-                        onClick={handleAddCategory} 
-                        className="bg-primary hover:bg-primary/90 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 transition-transform active:scale-95"
-                      >
-                        <Plus size={24} strokeWidth={3}/>
-                      </button>
-                  </div>
+      {/* Simplified Category Registry Modal - Inspired by provided Todo template */}
+      <Modal title="Manage Categories" isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)}>
+          <div className="space-y-6 py-2">
+              {/* Add Bar */}
+              <div className="flex gap-2">
+                  <input 
+                    className="flex-1 px-4 h-12 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium text-sm outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
+                    placeholder="New category name..."
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
+                  />
+                  <button 
+                    onClick={handleAddCategory} 
+                    className="bg-black text-white w-12 h-12 rounded-xl flex items-center justify-center shadow-md hover:bg-slate-800 transition-all active:scale-90 flex-shrink-0"
+                  >
+                    <Plus size={24} strokeWidth={2.5}/>
+                  </button>
               </div>
 
-              <div className="space-y-4">
-                  <div className="flex items-center justify-between px-2">
-                      <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                          <LayoutGrid size={14} /> Current Registry
-                      </p>
-                      <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full">{categories.length} Items</span>
-                  </div>
-                  
-                  <div className="max-h-[300px] overflow-y-auto pr-2 custom-scrollbar space-y-2.5">
-                    {categories.map(cat => (
-                        <div key={cat.id} className="group flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 hover:border-primary/30 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-200 min-w-0 shadow-sm">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-700 flex items-center justify-center text-slate-400 dark:text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                    <Tag size={16} />
-                                </div>
-                                <span className="font-black text-slate-700 dark:text-white text-sm truncate uppercase tracking-tight">{cat.name}</span>
-                            </div>
-                            <button 
-                                onClick={() => handleDeleteCategory(cat.id)} 
-                                className="text-slate-200 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                                title="Remove category"
-                            >
-                                <X size={18} strokeWidth={3}/>
-                            </button>
-                        </div>
-                    ))}
-                    
-                    {categories.length === 0 && (
-                        <div className="text-center py-12 px-6 bg-slate-50 dark:bg-slate-900/20 rounded-[2rem] border border-dashed border-gray-200 dark:border-slate-800">
-                            <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm text-slate-300">
-                                <Tag size={24} />
-                            </div>
-                            <p className="text-slate-400 text-sm font-bold">No categories defined</p>
-                            <p className="text-[10px] text-slate-300 uppercase tracking-widest mt-1">Start by adding one above</p>
-                        </div>
-                    )}
-                  </div>
+              {/* List */}
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                {categories.map(cat => (
+                    <div key={cat.id} className="group flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-gray-200 transition-all duration-200">
+                        <span className="font-bold text-slate-700 dark:text-white text-sm uppercase tracking-tight">{cat.name}</span>
+                        <button 
+                            onClick={() => handleDeleteCategory(cat.id)} 
+                            className="text-slate-300 hover:text-red-500 p-1.5 transition-colors"
+                        >
+                            <X size={18} strokeWidth={2.5}/>
+                        </button>
+                    </div>
+                ))}
+                
+                {categories.length === 0 && (
+                    <div className="text-center py-10">
+                        <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No Categories</p>
+                    </div>
+                )}
               </div>
 
-              <div className="pt-2">
+              {/* Footer */}
+              <div className="pt-4 flex flex-col items-center gap-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                     {categories.length} Total Labels
+                  </p>
                   <button 
                     onClick={() => setIsCatModalOpen(false)} 
-                    className="w-full h-12 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:bg-black dark:hover:bg-white transition-all shadow-xl active:scale-95"
+                    className="w-full h-12 bg-black text-white rounded-xl font-bold text-xs uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-md active:scale-95"
                   >
                     Done
                   </button>
