@@ -8,11 +8,13 @@ import { Product, Supplier, Category } from '../types';
 import { Plus, Trash2, Edit, Upload, FileDown, Filter, Settings2, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { useNotification } from '../context/NotificationContext';
 import Papa from 'papaparse';
 
 export const Inventory = () => {
   const { user } = useAuth();
   const { formatCurrency } = useSettings();
+  const { notify } = useNotification();
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -57,9 +59,25 @@ export const Inventory = () => {
     try {
         if (activeTab === 'products') {
             if (!formData.name) return;
+            
+            const category = formData.category || 'General';
+            
+            // DUPLICATE CHECK: Name + Category
+            const isDuplicate = products.some(p => 
+                p.id !== formData.id && // Don't block if we are editing the existing item
+                p.name.toLowerCase().trim() === formData.name.toLowerCase().trim() &&
+                p.category.toLowerCase().trim() === category.toLowerCase().trim()
+            );
+
+            if (isDuplicate) {
+                notify(`${formData.name} already exists in the ${category} category.`, 'warning', 'Duplicate Found');
+                return;
+            }
+
             await Api.saveProduct({ 
               ...formData, 
               ...commonData,
+              category,
               lastUpdated: Date.now() 
             } as Product);
         } else if (activeTab === 'suppliers') {
@@ -166,16 +184,29 @@ export const Inventory = () => {
                   return;
               }
 
-              const existingNames = new Set(products.map(p => p.name.toLowerCase().trim()));
               const newProducts: Product[] = [];
               let skippedCount = 0;
+              const duplicatesList: string[] = [];
 
               for (const row of rows) {
                   const productName = String(row[nameKey] || '').trim();
                   if (!productName) continue;
+                  const productCategory = String(row[catKey] || 'General').trim();
 
-                  // Skip if already exists
-                  if (existingNames.has(productName.toLowerCase())) {
+                  // DUPLICATE CHECK: Name + Category
+                  const existsInInventory = products.some(p => 
+                      p.name.toLowerCase().trim() === productName.toLowerCase().trim() &&
+                      p.category.toLowerCase().trim() === productCategory.toLowerCase().trim()
+                  );
+
+                  // Internal Duplicate Check (to prevent duplicates within the same CSV)
+                  const existsInBatch = newProducts.some(p => 
+                    p.name.toLowerCase() === productName.toLowerCase() &&
+                    p.category.toLowerCase() === productCategory.toLowerCase()
+                  );
+
+                  if (existsInInventory || existsInBatch) {
+                      duplicatesList.push(productName);
                       skippedCount++;
                       continue;
                   }
@@ -187,29 +218,34 @@ export const Inventory = () => {
                       quantity: parseInt(row[qtyKey]) || 0,
                       buyPrice: parseFloat(row[buyKey]) || 0,
                       sellPrice: parseFloat(row[sellKey]) || 0,
-                      category: String(row[catKey] || 'General').trim(),
+                      category: productCategory,
                       supplierId: String(row[supKey] || '').trim(),
                       lastUpdated: Date.now()
                   } as Product);
               }
 
+              if (duplicatesList.length > 0) {
+                  const displayNames = duplicatesList.length > 5 
+                    ? `${duplicatesList.slice(0, 5).join(', ')} and ${duplicatesList.length - 5} others`
+                    : duplicatesList.join(', ');
+                  notify(`${displayNames} already exist.`, 'warning', 'Duplicates Skipped');
+              }
+
               if (newProducts.length > 0) {
-                  const skipMsg = skippedCount > 0 ? ` (${skippedCount} existing items were skipped)` : "";
-                  if (window.confirm(`Found ${newProducts.length} new valid products${skipMsg}. Import them?`)) {
+                  const skipMsg = skippedCount > 0 ? ` (${skippedCount} duplicates skipped)` : "";
+                  if (window.confirm(`Import ${newProducts.length} new products?${skipMsg}`)) {
                       try {
                           await Api.importProducts(newProducts);
-                          alert("Import successful!");
+                          notify(`Imported ${newProducts.length} items successfully.`, 'success', 'Import Complete');
                           loadData();
                       } catch (err: any) {
                           alert("Import failed: " + err.message);
                       }
                   }
+              } else if (skippedCount > 0) {
+                  alert("All items in the CSV already exist in this category.");
               } else {
-                  if (skippedCount > 0) {
-                      alert(`All items in this CSV already exist in your inventory. No new items imported.`);
-                  } else {
-                      alert("No valid new products found in CSV.");
-                  }
+                  alert("No valid products found in CSV.");
               }
               
               if (fileInputRef.current) fileInputRef.current.value = "";
