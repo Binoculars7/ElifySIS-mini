@@ -52,6 +52,9 @@ export const Inventory = () => {
 
   useEffect(() => { loadData(); }, [user]);
 
+  // Helper for normalization to prevent subtle duplicate misses
+  const normalize = (str: string) => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
+
   const handleSave = async () => {
     if (!user) return;
     const commonData = { businessId: user.businessId };
@@ -60,26 +63,26 @@ export const Inventory = () => {
         if (activeTab === 'products') {
             if (!formData.name) return;
             
-            const name = formData.name.trim();
-            const category = formData.category || 'General';
+            const normalizedName = normalize(formData.name);
+            const normalizedCategory = normalize(formData.category || 'General');
             
-            // DUPLICATE CHECK: Name + Category (Case-insensitive)
+            // Check against existing products in state
             const isDuplicate = products.some(p => 
-                p.id !== formData.id && // Ignore self when editing
-                p.name.toLowerCase().trim() === name.toLowerCase() &&
-                p.category.toLowerCase().trim() === category.toLowerCase().trim()
+                p.id !== formData.id && 
+                normalize(p.name) === normalizedName &&
+                normalize(p.category) === normalizedCategory
             );
 
             if (isDuplicate) {
-                notify(`${name} (in category "${category}") already exists.`, 'warning', 'Duplicate Entry');
+                notify(`${formData.name} already exist in the ${formData.category || 'General'} category.`, 'warning', 'Duplicate Found');
                 return;
             }
 
             await Api.saveProduct({ 
               ...formData, 
               ...commonData,
-              name,
-              category,
+              name: formData.name.trim(),
+              category: formData.category || 'General',
               lastUpdated: Date.now() 
             } as Product);
         } else if (activeTab === 'suppliers') {
@@ -95,7 +98,7 @@ export const Inventory = () => {
         }
         
         setIsModalOpen(false);
-        loadData();
+        await loadData(); // Reload to sync state
         setFormData({});
     } catch (err: any) {
         alert("Save failed: " + err.message);
@@ -112,7 +115,7 @@ export const Inventory = () => {
           } else if (type === 'product') {
               await Api.deleteProduct(id);
           }
-          loadData();
+          await loadData();
           setDeleteModal({ isOpen: false, id: '', type: 'product' });
       } catch (err: any) {
           alert("Delete failed: " + err.message);
@@ -136,7 +139,7 @@ export const Inventory = () => {
       try {
           await Api.adjustStock(adjustModal.productId, qty, type);
           setAdjustModal({ ...adjustModal, isOpen: false });
-          loadData();
+          await loadData();
       } catch (err: any) {
           alert("Adjustment failed: " + err.message);
       }
@@ -168,6 +171,7 @@ export const Inventory = () => {
                   return;
               }
 
+              // Mapping logic
               const fields = results.meta.fields || [];
               const findKey = (candidates: string[]) => 
                   fields.find(f => candidates.some(c => f.toLowerCase() === c.toLowerCase()));
@@ -188,26 +192,29 @@ export const Inventory = () => {
               const newProducts: Product[] = [];
               const duplicatesList: string[] = [];
 
+              // IMPORTANT: Using current state 'products' for comparison
               for (const row of rows) {
                   const productName = String(row[nameKey] || '').trim();
                   if (!productName) continue;
                   
                   const productCategory = String(row[catKey] || 'General').trim();
+                  const normName = normalize(productName);
+                  const normCat = normalize(productCategory);
 
-                  // CHECK 1: Exists in the database inventory (Name + Category)
+                  // 1. Check against DB records loaded in 'products' state
                   const existsInInventory = products.some(p => 
-                      p.name.toLowerCase().trim() === productName.toLowerCase() &&
-                      p.category.toLowerCase().trim() === productCategory.toLowerCase()
+                      normalize(p.name) === normName &&
+                      normalize(p.category) === normCat
                   );
 
-                  // CHECK 2: Exists in the current batch (prevent duplicates within the file)
+                  // 2. Check against items already added to this batch to prevent internal CSV duplicates
                   const existsInBatch = newProducts.some(p => 
-                    p.name.toLowerCase() === productName.toLowerCase() &&
-                    p.category.toLowerCase() === productCategory.toLowerCase()
+                    normalize(p.name) === normName &&
+                    normalize(p.category) === normCat
                   );
 
                   if (existsInInventory || existsInBatch) {
-                      duplicatesList.push(`${productName} (${productCategory})`);
+                      duplicatesList.push(productName);
                       continue;
                   }
 
@@ -224,30 +231,30 @@ export const Inventory = () => {
                   } as Product);
               }
 
-              // Show notification for skipped items
+              // Notify for skipped duplicates
               if (duplicatesList.length > 0) {
-                  const limit = 3;
+                  const limit = 4;
                   const displayList = duplicatesList.length > limit 
                     ? `${duplicatesList.slice(0, limit).join(', ')} and ${duplicatesList.length - limit} others` 
                     : duplicatesList.join(', ');
                   
-                  notify(`${displayList} already exist and were skipped.`, 'warning', 'Duplicates Skipped');
+                  notify(`${displayList} already exist.`, 'warning', 'Items Skipped');
               }
 
               if (newProducts.length > 0) {
-                  if (window.confirm(`Found ${newProducts.length} new products to import. Proceed?`)) {
+                  if (window.confirm(`Found ${newProducts.length} new products to import. Skip duplicates and proceed?`)) {
                       try {
                           await Api.importProducts(newProducts);
-                          notify(`Imported ${newProducts.length} items successfully.`, 'success', 'Import Complete');
-                          loadData();
+                          notify(`Imported ${newProducts.length} products successfully.`, 'success', 'Import Complete');
+                          await loadData(); // Re-sync state immediately
                       } catch (err: any) {
                           alert("Import failed: " + err.message);
                       }
                   }
               } else if (duplicatesList.length > 0) {
-                  notify("No new products were found. All items in the CSV already exist in the inventory.", 'info', 'Nothing to Import');
+                  notify("No new products added. All items in CSV already exist in your inventory.", 'info', 'Import Finished');
               } else {
-                  alert("No valid product data found in the CSV.");
+                  alert("No valid product data found in CSV.");
               }
               
               if (fileInputRef.current) fileInputRef.current.value = "";
