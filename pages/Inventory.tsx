@@ -60,23 +60,25 @@ export const Inventory = () => {
         if (activeTab === 'products') {
             if (!formData.name) return;
             
+            const name = formData.name.trim();
             const category = formData.category || 'General';
             
-            // DUPLICATE CHECK: Name + Category
+            // DUPLICATE CHECK: Name + Category (Case-insensitive)
             const isDuplicate = products.some(p => 
-                p.id !== formData.id && // Don't block if we are editing the existing item
-                p.name.toLowerCase().trim() === formData.name.toLowerCase().trim() &&
+                p.id !== formData.id && // Ignore self when editing
+                p.name.toLowerCase().trim() === name.toLowerCase() &&
                 p.category.toLowerCase().trim() === category.toLowerCase().trim()
             );
 
             if (isDuplicate) {
-                notify(`${formData.name} already exists in the ${category} category.`, 'warning', 'Duplicate Found');
+                notify(`${name} (in category "${category}") already exists.`, 'warning', 'Duplicate Entry');
                 return;
             }
 
             await Api.saveProduct({ 
               ...formData, 
               ...commonData,
+              name,
               category,
               lastUpdated: Date.now() 
             } as Product);
@@ -166,7 +168,6 @@ export const Inventory = () => {
                   return;
               }
 
-              // Mapping logic to find column names case-insensitively
               const fields = results.meta.fields || [];
               const findKey = (candidates: string[]) => 
                   fields.find(f => candidates.some(c => f.toLowerCase() === c.toLowerCase()));
@@ -180,34 +181,33 @@ export const Inventory = () => {
               const supKey = findKey(['supplierid', 'supplier', 'vendor']);
 
               if (!nameKey) {
-                  alert("CSV Error: Could not find a 'Name' column.");
+                  alert("CSV Error: No 'Name' column found.");
                   return;
               }
 
               const newProducts: Product[] = [];
-              let skippedCount = 0;
               const duplicatesList: string[] = [];
 
               for (const row of rows) {
                   const productName = String(row[nameKey] || '').trim();
                   if (!productName) continue;
+                  
                   const productCategory = String(row[catKey] || 'General').trim();
 
-                  // DUPLICATE CHECK: Name + Category
+                  // CHECK 1: Exists in the database inventory (Name + Category)
                   const existsInInventory = products.some(p => 
-                      p.name.toLowerCase().trim() === productName.toLowerCase().trim() &&
-                      p.category.toLowerCase().trim() === productCategory.toLowerCase().trim()
+                      p.name.toLowerCase().trim() === productName.toLowerCase() &&
+                      p.category.toLowerCase().trim() === productCategory.toLowerCase()
                   );
 
-                  // Internal Duplicate Check (to prevent duplicates within the same CSV)
+                  // CHECK 2: Exists in the current batch (prevent duplicates within the file)
                   const existsInBatch = newProducts.some(p => 
                     p.name.toLowerCase() === productName.toLowerCase() &&
                     p.category.toLowerCase() === productCategory.toLowerCase()
                   );
 
                   if (existsInInventory || existsInBatch) {
-                      duplicatesList.push(productName);
-                      skippedCount++;
+                      duplicatesList.push(`${productName} (${productCategory})`);
                       continue;
                   }
 
@@ -224,16 +224,18 @@ export const Inventory = () => {
                   } as Product);
               }
 
+              // Show notification for skipped items
               if (duplicatesList.length > 0) {
-                  const displayNames = duplicatesList.length > 5 
-                    ? `${duplicatesList.slice(0, 5).join(', ')} and ${duplicatesList.length - 5} others`
+                  const limit = 3;
+                  const displayList = duplicatesList.length > limit 
+                    ? `${duplicatesList.slice(0, limit).join(', ')} and ${duplicatesList.length - limit} others` 
                     : duplicatesList.join(', ');
-                  notify(`${displayNames} already exist.`, 'warning', 'Duplicates Skipped');
+                  
+                  notify(`${displayList} already exist and were skipped.`, 'warning', 'Duplicates Skipped');
               }
 
               if (newProducts.length > 0) {
-                  const skipMsg = skippedCount > 0 ? ` (${skippedCount} duplicates skipped)` : "";
-                  if (window.confirm(`Import ${newProducts.length} new products?${skipMsg}`)) {
+                  if (window.confirm(`Found ${newProducts.length} new products to import. Proceed?`)) {
                       try {
                           await Api.importProducts(newProducts);
                           notify(`Imported ${newProducts.length} items successfully.`, 'success', 'Import Complete');
@@ -242,10 +244,10 @@ export const Inventory = () => {
                           alert("Import failed: " + err.message);
                       }
                   }
-              } else if (skippedCount > 0) {
-                  alert("All items in the CSV already exist in this category.");
+              } else if (duplicatesList.length > 0) {
+                  notify("No new products were found. All items in the CSV already exist in the inventory.", 'info', 'Nothing to Import');
               } else {
-                  alert("No valid products found in CSV.");
+                  alert("No valid product data found in the CSV.");
               }
               
               if (fileInputRef.current) fileInputRef.current.value = "";
