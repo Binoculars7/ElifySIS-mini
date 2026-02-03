@@ -98,7 +98,7 @@ export const Inventory = () => {
         }
         
         setIsModalOpen(false);
-        await loadData(); // Reload to sync state
+        await loadData(); 
         setFormData({});
     } catch (err: any) {
         alert("Save failed: " + err.message);
@@ -171,7 +171,6 @@ export const Inventory = () => {
                   return;
               }
 
-              // Mapping logic
               const fields = results.meta.fields || [];
               const findKey = (candidates: string[]) => 
                   fields.find(f => candidates.some(c => f.toLowerCase() === c.toLowerCase()));
@@ -192,7 +191,6 @@ export const Inventory = () => {
               const newProducts: Product[] = [];
               const duplicatesList: string[] = [];
 
-              // IMPORTANT: Using current state 'products' for comparison
               for (const row of rows) {
                   const productName = String(row[nameKey] || '').trim();
                   if (!productName) continue;
@@ -201,13 +199,11 @@ export const Inventory = () => {
                   const normName = normalize(productName);
                   const normCat = normalize(productCategory);
 
-                  // 1. Check against DB records loaded in 'products' state
                   const existsInInventory = products.some(p => 
                       normalize(p.name) === normName &&
                       normalize(p.category) === normCat
                   );
 
-                  // 2. Check against items already added to this batch to prevent internal CSV duplicates
                   const existsInBatch = newProducts.some(p => 
                     normalize(p.name) === normName &&
                     normalize(p.category) === normCat
@@ -231,7 +227,6 @@ export const Inventory = () => {
                   } as Product);
               }
 
-              // Notify for skipped duplicates
               if (duplicatesList.length > 0) {
                   const limit = 4;
                   const displayList = duplicatesList.length > limit 
@@ -246,7 +241,7 @@ export const Inventory = () => {
                       try {
                           await Api.importProducts(newProducts);
                           notify(`Imported ${newProducts.length} products successfully.`, 'success', 'Import Complete');
-                          await loadData(); // Re-sync state immediately
+                          await loadData(); 
                       } catch (err: any) {
                           alert("Import failed: " + err.message);
                       }
