@@ -1,3 +1,4 @@
+
 /** @jsx React.createElement */
 /** @jsxFrag React.Fragment */
 import React, { useState, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { Product, SaleItem, Sale } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { useSettings } from '../context/SettingsContext';
-import { ShoppingCart, CheckCircle, Printer, Search, Plus, Minus, CreditCard, Banknote, RefreshCcw, User, ArrowRight, FileText, Download, LayoutTemplate, Store, Eye, History } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Printer, Search, Plus, Minus, CreditCard, Banknote, RefreshCcw, User, ArrowRight, FileText, Download, LayoutTemplate, Store, Eye, History, X } from 'lucide-react';
 
 export const Sales = () => {
   const { user } = useAuth();
@@ -130,6 +131,10 @@ export const Sales = () => {
     } else {
       setCart(cart.map(item => item.productId === productId ? { ...item, quantity: newQty, total: newQty * item.cost } : item));
     }
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(cart.filter(item => item.productId !== productId));
   };
 
   const generateTicket = async () => {
@@ -333,7 +338,7 @@ export const Sales = () => {
                                     </div>
                                 )}
                                 {cart.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700 p-2 rounded-lg border border-gray-100 dark:border-slate-600">
+                                    <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700 p-2 rounded-lg border border-gray-100 dark:border-slate-600 group">
                                         <div className="flex-1 min-w-0 pr-1">
                                             <p className="font-bold text-[11px] text-textPrimary dark:text-gray-100 truncate">{item.productName}</p>
                                             <p className="text-[9px] text-gray-500 dark:text-gray-400">{formatCurrency(item.cost)}</p>
@@ -342,6 +347,7 @@ export const Sales = () => {
                                             <button onClick={() => updateQuantity(item.productId, -1)} className="p-0.5 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm text-gray-600 dark:text-gray-300"><Minus size={12}/></button>
                                             <span className="font-bold text-[11px] w-3 text-center text-textPrimary dark:text-white">{item.quantity}</span>
                                             <button onClick={() => updateQuantity(item.productId, 1)} className="p-0.5 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm text-gray-600 dark:text-gray-300"><Plus size={12}/></button>
+                                            <button onClick={() => removeFromCart(item.productId)} className="p-1 text-red-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-600 rounded ml-1 transition-colors" title="Cancel Item"><X size={12}/></button>
                                         </div>
                                         <div className="min-w-[70px] text-right font-bold text-[11px] text-primary shrink-0">{formatCurrency(item.total)}</div>
                                     </div>
