@@ -1,3 +1,4 @@
+
 /** @jsx React.createElement */
 /** @jsxFrag React.Fragment */
 import React, { useState, useEffect, useMemo } from 'react';
@@ -91,7 +92,7 @@ export const Reports = () => {
               totalCost,
               profit: totalRevenue - totalCost
           };
-      }).filter(item => item.qtySold > 0 || item.openingStock > 0 || item.closingStock > 0)
+      }).filter(item => item.qtySold > 0) // Only show products with actual sales
         .sort((a, b) => b.profit - a.profit);
   }, [products, sales, stockLogs, startDate, endDate]);
 
