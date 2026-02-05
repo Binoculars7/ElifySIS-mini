@@ -627,8 +627,16 @@ const SupabaseService = {
           const e = await SupabaseService.getExpenses(bid).catch(() => []);
 
           let totalRevenue = 0;
+          let grossProfit = 0;
           s.forEach((sale: Sale) => {
               totalRevenue += (sale.totalAmount || 0);
+              (sale.items || []).forEach(item => {
+                  const product = p.find(prod => prod.id === item.productId);
+                  if (product) {
+                      // Gross Profit = ∑ (Selling Price - Buy Price) * Qty
+                      grossProfit += (item.cost - product.buyPrice) * item.quantity;
+                  }
+              });
           });
 
           let totalExpenses = 0;
@@ -640,12 +648,13 @@ const SupabaseService = {
           
           return {
               productCount: p.length, customerCount: c.length, saleCount: s.length,
-              totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses,
+              totalRevenue, totalExpenses, grossProfit, 
+              netProfit: grossProfit - totalExpenses,
               lowStockCount: lowStockProducts.length,
               lowStockNames: lowStockProducts.map(prod => prod.name)
           };
       } catch (err) {
-          return { productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0, lowStockNames: [] };
+          return { productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, grossProfit: 0, netProfit: 0, lowStockCount: 0, lowStockNames: [] };
       }
   },
 
@@ -735,7 +744,7 @@ const MockService = {
   getEmployees: async () => [], saveEmployee: async () => {}, deleteEmployee: async () => {},
   getSuppliers: async () => [], saveSupplier: async () => {}, deleteSupplier: async () => {},
   getExpenses: async () => [], addExpense: async () => {}, deleteExpense: async () => {},
-  getDashboardStats: async () => ({ productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0, lowStockCount: 0, lowStockNames: [] }),
+  getDashboardStats: async () => ({ productCount: 0, customerCount: 0, saleCount: 0, totalRevenue: 0, totalExpenses: 0, grossProfit: 0, netProfit: 0, lowStockCount: 0, lowStockNames: [] }),
   getSettings: async () => ({ businessId: '', currency: 'USD', currencySymbol: '$' }),
   saveSettings: async () => {}, getNotifications: async () => [], saveNotification: async () => {},
   markNotificationRead: async () => {}

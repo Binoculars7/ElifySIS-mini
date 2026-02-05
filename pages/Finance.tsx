@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, DataTable, Button, Input, Modal, Select, ConfirmationModal } from '../components/UI';
 import { Api } from '../services/api';
-import { Expense, ExpenseCategory } from '../types';
+import { Expense, ExpenseCategory, Sale, Product } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { TrendingDown, TrendingUp, DollarSign, Trash2, Calendar, Search, Tag, Settings2, Plus, LayoutGrid, X, ReceiptText, ChevronRight, Hash, Layers } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -14,8 +14,10 @@ export const Finance = () => {
   const { user } = useAuth();
   const { formatCurrency } = useSettings();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [stats, setStats] = useState<any>({ income: 0, expense: 0, profit: 0 });
+  const [isLoading, setIsLoading] = useState(true);
   
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
@@ -33,17 +35,22 @@ export const Finance = () => {
 
   const loadData = async () => {
     if (!user) return;
+    setIsLoading(true);
     try {
-        const [e, s, c] = await Promise.all([
+        const [e, s, p, c] = await Promise.all([
             Api.getExpenses(user.businessId),
-            Api.getDashboardStats(user.businessId),
+            Api.getSales(user.businessId),
+            Api.getProducts(user.businessId),
             Api.getExpenseCategories(user.businessId)
         ]);
         setExpenses(e);
-        setStats({ income: s.totalRevenue, expense: s.totalExpenses, profit: s.netProfit });
+        setSales(s);
+        setProducts(p);
         setCategories(c);
     } catch (err) {
         console.error("Finance Load Failed:", err);
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -107,26 +114,68 @@ export const Finance = () => {
       return filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   }, [filteredExpenses]);
 
+  /**
+   * GROSS INCOME CALCULATION
+   * Gross Income = ∑ (Selling Price - Actual Price) * Qty Sold
+   */
+  const filteredGrossIncome = useMemo(() => {
+      const start = new Date(startDate).setHours(0,0,0,0);
+      const end = new Date(endDate).setHours(23,59,59,999);
+      
+      const rangeSales = sales.filter(s => s.date >= start && s.date <= end);
+      let totalMargin = 0;
+
+      rangeSales.forEach(sale => {
+          sale.items.forEach(item => {
+              const product = products.find(p => p.id === item.productId);
+              if (product) {
+                  // Margin = (Unit Sell Price - Unit Buy Price) * Qty
+                  totalMargin += (item.cost - product.buyPrice) * item.quantity;
+              }
+          });
+      });
+
+      return totalMargin;
+  }, [sales, products, startDate, endDate]);
+
+  const netProfit = useMemo(() => {
+      return filteredGrossIncome - filteredExpenseTotal;
+  }, [filteredGrossIncome, filteredExpenseTotal]);
+
   const chartData = [
-    { name: 'Income', value: stats.income, color: '#1A73E8' },
-    { name: 'Expense', value: filteredExpenseTotal, color: '#EF4444' },
-    { name: 'Net', value: Math.max(0, stats.income - filteredExpenseTotal), color: '#22C55E' },
+    { name: 'Gross Income', value: filteredGrossIncome, color: '#1A73E8' },
+    { name: 'Expenditure', value: filteredExpenseTotal, color: '#EF4444' },
+    { name: 'Net Profit', value: Math.max(0, netProfit), color: '#22C55E' },
   ].filter(d => d.value > 0);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        <p className="text-sm font-bold text-textSecondary uppercase tracking-widest">Loading Finance Data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-l-4 border-green-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
+        <Card className="border-l-4 border-blue-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
            <p className="text-slate-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 truncate">Gross Income</p>
-           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(stats.income)}</h3>
+           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(filteredGrossIncome)}</h3>
+           <p className="text-[10px] text-gray-400 mt-1">Total Margin for Period</p>
         </Card>
         <Card className="border-l-4 border-red-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
            <p className="text-slate-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 truncate">Expenditure</p>
-           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(stats.expense)}</h3>
+           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(filteredExpenseTotal)}</h3>
+           <p className="text-[10px] text-gray-400 mt-1">Sum of Logged Expenses</p>
         </Card>
-        <Card className="border-l-4 border-blue-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
+        <Card className="border-l-4 border-green-500 bg-white dark:bg-slate-800 min-w-0 shadow-none">
            <p className="text-slate-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 truncate">Net Profit</p>
-           <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{formatCurrency(stats.profit)}</h3>
+           <h3 className={`text-2xl font-black truncate ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+               {formatCurrency(netProfit)}
+           </h3>
+           <p className="text-[10px] text-gray-400 mt-1">Income - Expenditure</p>
         </Card>
       </div>
 
@@ -270,7 +319,6 @@ export const Finance = () => {
         message="This will permanently delete this record from the ledger."
       />
 
-      {/* Simplified Add Expense Modal */}
       <Modal title="Add New Expense" isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)}>
          <div className="space-y-5 py-2">
             <div className="space-y-4">
@@ -323,10 +371,8 @@ export const Finance = () => {
          </div>
       </Modal>
 
-      {/* Simplified Category Registry Modal - Inspired by provided Todo template */}
       <Modal title="Manage Categories" isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)}>
           <div className="space-y-6 py-2">
-              {/* Add Bar */}
               <div className="flex gap-2">
                   <input 
                     className="flex-1 px-4 h-12 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium text-sm outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
@@ -343,7 +389,6 @@ export const Finance = () => {
                   </button>
               </div>
 
-              {/* List */}
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
                 {categories.map(cat => (
                     <div key={cat.id} className="group flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-gray-200 transition-all duration-200">
@@ -364,7 +409,6 @@ export const Finance = () => {
                 )}
               </div>
 
-              {/* Footer */}
               <div className="pt-4 flex flex-col items-center gap-4">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                      {categories.length} Total Labels

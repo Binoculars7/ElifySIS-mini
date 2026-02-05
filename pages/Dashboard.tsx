@@ -85,7 +85,7 @@ export const Dashboard = () => {
         {!isRestricted ? (
           <>
             <StatCard title="Total Sales" value={formatCurrency(stats.totalRevenue)} icon={DollarSign} color="bg-blue-600 text-blue-600" />
-            <StatCard title="Net Profit" value={formatCurrency(stats.netProfit)} icon={TrendingUp} color="bg-green-600 text-green-600" />
+            <StatCard title="GROSS PROFIT" value={formatCurrency(stats.grossProfit)} icon={TrendingUp} color="bg-green-600 text-green-600" />
             <StatCard title="Customers" value={stats.customerCount} icon={Users} color="bg-purple-600 text-purple-600" />
           </>
         ) : (

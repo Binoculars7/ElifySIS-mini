@@ -374,20 +374,32 @@ export const Inventory = () => {
 
       <ConfirmationModal isOpen={deleteModal.isOpen} onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })} onConfirm={confirmDelete} title="Confirm Deletion" message="This action is irreversible. All associated records may be affected." />
 
-      <Modal isOpen={adjustModal.isOpen} onClose={() => setAdjustModal({...adjustModal, isOpen: false})} title="Audit Stock Adjustment">
-         <div className="space-y-4">
-             <div className="p-4 bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm border border-blue-100">
-                 <p className="font-black uppercase tracking-widest text-[10px] mb-1">Target Product</p>
-                 <p className="font-bold text-lg leading-tight mb-2">{adjustModal.productName}</p>
-                 <div className="flex justify-between items-center text-xs opacity-80">
-                    <span>Current Inventory:</span>
-                    <span className="font-black">{adjustModal.currentQty} Units</span>
-                 </div>
+      <Modal isOpen={adjustModal.isOpen} onClose={() => setAdjustModal({...adjustModal, isOpen: false})} title="Update Stock Level">
+         <div className="space-y-6">
+             {/* Simplified Product Display */}
+             <div className="p-4 bg-blue-50 dark:bg-slate-900 border border-blue-100 dark:border-slate-700 rounded-xl flex flex-col gap-2">
+                <p className="text-lg font-bold text-slate-900 dark:text-white truncate leading-tight">{adjustModal.productName}</p>
+                <div className="flex justify-between items-center text-xs text-slate-500 font-bold uppercase tracking-widest">
+                   <span>Current Inventory:</span>
+                   <span className="text-primary font-black">{adjustModal.currentQty} Units</span>
+                </div>
              </div>
-             <Input label="Adjustment Value (+ or -)" type="number" value={adjustQty} onChange={e => setAdjustQty(e.target.value)} placeholder="e.g. 10 to restock, -2 for damage" />
-             <div className="flex justify-end gap-3 mt-8">
-                <Button variant="secondary" onClick={() => setAdjustModal({...adjustModal, isOpen: false})}>Discard</Button>
-                <Button onClick={handleStockAdjustment}>Apply Audit</Button>
+
+             <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Adjustment (+ or -)</label>
+                <input 
+                  type="number" 
+                  autoFocus
+                  value={adjustQty} 
+                  onChange={e => setAdjustQty(e.target.value)} 
+                  placeholder="0"
+                  className="w-full h-12 px-4 rounded-xl border border-slate-600 bg-slate-700 text-white font-mono text-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                />
+             </div>
+
+             <div className="flex gap-3 mt-4">
+                <Button variant="secondary" onClick={() => setAdjustModal({...adjustModal, isOpen: false})} className="flex-1">Discard</Button>
+                <Button onClick={handleStockAdjustment} className="flex-1">Apply Update</Button>
              </div>
          </div>
       </Modal>

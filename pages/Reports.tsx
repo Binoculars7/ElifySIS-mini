@@ -25,6 +25,7 @@ export const Reports = () => {
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedProductId, setSelectedProductId] = useState('all');
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -46,20 +47,30 @@ export const Reports = () => {
     loadData();
   }, [user]);
 
-  const handlePreset = (type: 'today' | 'week' | 'month' | 'year') => {
+  const handlePreset = (type: 'today' | 'yesterday' | 'week' | 'month' | 'year') => {
       const now = new Date();
       let start = new Date();
+      let end = new Date();
+
       if (type === 'today') {
           start = new Date();
+          end = new Date();
+      } else if (type === 'yesterday') {
+          start.setDate(now.getDate() - 1);
+          end.setDate(now.getDate() - 1);
       } else if (type === 'week') {
           start.setDate(now.getDate() - now.getDay());
+          end = new Date();
       } else if (type === 'month') {
           start.setDate(1);
+          end = new Date();
       } else if (type === 'year') {
           start.setMonth(0, 1);
+          end = new Date();
       }
       setStartDate(start.toISOString().split('T')[0]);
-      setEndDate(now.toISOString().split('T')[0]);
+      setEndDate(end.toISOString().split('T')[0]);
+      setActivePreset(type);
   };
 
   const getStockAtTime = (productId: string, targetTime: number) => {
@@ -75,13 +86,20 @@ export const Reports = () => {
       const end = new Date(endDate).setHours(23,59,59,999);
       
       return products.map(p => {
+          // Filter sales within the range that contain this product
           const productSales = sales.filter(s => s.date >= start && s.date <= end)
               .flatMap(s => s.items)
               .filter(item => item.productId === p.id);
           
           const qtySold = productSales.reduce((acc, curr) => acc + curr.quantity, 0);
-          const totalRevenue = productSales.reduce((acc, curr) => acc + curr.total, 0);
-          const totalCost = qtySold * p.buyPrice;
+          
+          /**
+           * CALCULATIONS:
+           * Total Cost = Selling Price * Qty Sold
+           * Gross Profit = (Selling Price - Buy Price) * Qty Sold
+           */
+          const totalCost = p.sellPrice * qtySold;
+          const profit = (p.sellPrice - p.buyPrice) * qtySold;
           
           return {
               id: p.id,
@@ -90,9 +108,9 @@ export const Reports = () => {
               openingStock: getStockAtTime(p.id, start),
               closingStock: getStockAtTime(p.id, end),
               totalCost,
-              profit: totalRevenue - totalCost
+              profit
           };
-      }).filter(item => item.qtySold > 0) // Only show products with actual sales
+      }).filter(item => item.qtySold > 0) 
         .sort((a, b) => b.profit - a.profit);
   }, [products, sales, stockLogs, startDate, endDate]);
 
@@ -135,7 +153,6 @@ export const Reports = () => {
   }, [stockLogs, startDate, endDate, selectedProductId, products]);
 
   const print = () => {
-    // Force a small delay to ensure any dynamic rendering is caught
     setTimeout(() => {
         window.print();
     }, 100);
@@ -150,7 +167,6 @@ export const Reports = () => {
     );
   }
 
-  // Helper to format date for display in the styled boxes
   const formatDisplayDate = (d: string) => {
       if (!d) return 'Select Date';
       return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -158,7 +174,6 @@ export const Reports = () => {
 
   return (
     <div className="space-y-6">
-      {/* Print Styles Injection */}
       <style>{`
         @media print {
             body { 
@@ -186,7 +201,6 @@ export const Reports = () => {
         }
       `}</style>
 
-      {/* Header Navigation */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 no-print">
         <div className="flex bg-white dark:bg-slate-800 p-1.5 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 w-full md:w-auto">
           <button 
@@ -208,45 +222,47 @@ export const Reports = () => {
         </Button>
       </div>
 
-      {/* Date & Filter Controls */}
       <Card className="no-print border border-gray-200 dark:border-slate-700 shadow-none overflow-visible">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
               <div className="lg:col-span-3">
                   <p className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-2">Preset Ranges</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {['Today', 'Week', 'Month', 'Year'].map(label => (
-                        <button 
-                            key={label}
-                            onClick={() => handlePreset(label.toLowerCase() as any)}
-                            className="px-4 py-2 bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-xs font-bold hover:bg-primary hover:text-white transition-all shadow-sm"
-                        >
-                            {label}
-                        </button>
-                    ))}
+                    {['Today', 'Yesterday', 'Week', 'Month', 'Year'].map(label => {
+                        const type = label.toLowerCase();
+                        const isActive = activePreset === type;
+                        return (
+                          <button 
+                              key={label}
+                              onClick={() => handlePreset(type as any)}
+                              className={`px-4 py-2 border rounded-lg text-xs font-bold transition-all shadow-sm ${
+                                isActive 
+                                  ? 'bg-primary border-primary text-white' 
+                                  : 'bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+                              }`}
+                          >
+                              {label}
+                          </button>
+                        );
+                    })}
                   </div>
               </div>
 
               <div className="lg:col-span-5">
                   <p className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-2">Period Range</p>
                   <div className="flex flex-col sm:flex-row items-center gap-3">
-                    {/* START DATE BOX */}
                     <div className="relative w-full h-11 bg-slate-800 border border-slate-600 rounded-xl group hover:border-primary transition-colors flex items-center px-4">
                         <Calendar className="text-primary mr-3 flex-shrink-0" size={16} />
                         <span className="text-sm font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none">
                             {formatDisplayDate(startDate)}
                         </span>
-                        {/* THE FIX: Invisible native input covering the WHOLE area including the icon. */}
                         <input 
                             type="date" 
                             value={startDate} 
-                            onChange={e => setStartDate(e.target.value)} 
+                            onChange={e => { setStartDate(e.target.value); setActivePreset(null); }} 
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[100]" 
                         />
                     </div>
-
                     <span className="text-gray-400 font-bold hidden sm:inline flex-shrink-0 text-sm">to</span>
-
-                    {/* END DATE BOX */}
                     <div className="relative w-full h-11 bg-slate-800 border border-slate-600 rounded-xl group hover:border-primary transition-colors flex items-center px-4">
                         <Calendar className="text-primary mr-3 flex-shrink-0" size={16} />
                         <span className="text-sm font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none">
@@ -255,7 +271,7 @@ export const Reports = () => {
                         <input 
                             type="date" 
                             value={endDate} 
-                            onChange={e => setEndDate(e.target.value)} 
+                            onChange={e => { setEndDate(e.target.value); setActivePreset(null); }} 
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[100]" 
                         />
                     </div>
@@ -278,9 +294,7 @@ export const Reports = () => {
           </div>
       </Card>
 
-      {/* Report Worksheet Area */}
       <div className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 shadow-xl overflow-hidden rounded-2xl print:border-0 print:shadow-none print:w-full print:rounded-none">
-        {/* Worksheet Header */}
         <div className="bg-gray-50 dark:bg-slate-900/50 border-b border-gray-300 dark:border-slate-700 p-6 flex flex-col sm:flex-row justify-between items-center gap-4 print:p-4 print:bg-white print:border-b-2 print:border-black">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl shadow-inner print:hidden">
@@ -315,8 +329,8 @@ export const Reports = () => {
                   <th className="border border-gray-300 dark:border-slate-700 px-6 py-4 text-right">Qty Sold</th>
                   <th className="border border-gray-300 dark:border-slate-700 px-6 py-4 text-right">Opening</th>
                   <th className="border border-gray-300 dark:border-slate-700 px-6 py-4 text-right">Closing</th>
-                  <th className="border border-gray-300 dark:border-slate-700 px-6 py-4 text-right">Gross Cost</th>
-                  <th className="border border-gray-300 dark:border-slate-700 px-6 py-4 text-right">Net Profit</th>
+                  <th className="border border-gray-300 dark:border-slate-700 px-6 py-4 text-right">Total Cost</th>
+                  <th className="border border-gray-300 dark:border-slate-700 px-6 py-4 text-right">Gross Profit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-slate-700 print:text-black">
@@ -403,12 +417,10 @@ export const Reports = () => {
         )}
       </div>
       
-      {/* Worksheet Footer Message */}
       <div className="text-center no-print pb-10">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">End of Audit Statement. Internal Confidential Document.</p>
       </div>
       
-      {/* Print-only footer */}
       <div className="hidden print:block pt-10 text-center text-[10px] text-gray-500 italic">
           <p>Official ElifySIS Audit Report — Generated on {new Date().toLocaleString()}</p>
           <p>Page 1 of 1</p>
